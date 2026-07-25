@@ -9,13 +9,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("VisiFlow")
 
 class VisiFlowDetector:
-    def __init__(self, model_path: Optional[str] = "yolov8n.pt", use_yolo: bool = True, languages: List[str] = ["en", "ch_tra", "ch_sim"]):
+    def __init__(self, model_path: Optional[str] = "yolov8n.pt", use_yolo: bool = True, languages: List[str] = ["ch_tra", "en"]):
         """
         Initialize the VisiFlow local visual detector.
         
         :param model_path: Path to the YOLO model file (e.g. yolov8n.pt or a custom UI model pt/onnx).
         :param use_yolo: Whether to attempt loading and running YOLO.
-        :param languages: List of languages for EasyOCR. Defaults to English, Traditional Chinese, and Simplified Chinese.
+        :param languages: List of languages for EasyOCR. Defaults to Traditional Chinese and English.
         """
         self.use_yolo = use_yolo
         self.model = None
@@ -42,11 +42,17 @@ class VisiFlowDetector:
         try:
             import easyocr
             logger.info(f"Initializing local EasyOCR reader for languages: {self.languages}...")
-            self.ocr_reader = easyocr.Reader(self.languages, gpu=True) # Automatically detects CUDA/GPU
+            self.ocr_reader = easyocr.Reader(self.languages)
             logger.info("EasyOCR initialized successfully.")
         except Exception as e:
-            logger.error(f"Failed to initialize EasyOCR: {e}. Please ensure torch and easyocr are installed.")
-            self.ocr_reader = None
+            logger.warning(f"Failed to initialize EasyOCR with {self.languages}: {e}. Trying fallback ['ch_tra', 'en']...")
+            try:
+                import easyocr
+                self.ocr_reader = easyocr.Reader(["ch_tra", "en"])
+                logger.info("EasyOCR initialized successfully with fallback ['ch_tra', 'en'].")
+            except Exception as e2:
+                logger.error(f"Failed to initialize EasyOCR: {e2}")
+                self.ocr_reader = None
 
     def detect_contours(self, img: np.ndarray) -> List[Dict[str, Any]]:
         """
