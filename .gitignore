@@ -1,0 +1,27 @@
+# Agent and IDE directories
+.agent/
+.gemini/
+.opencode/
+openspec/
+
+# Node.js dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python build and caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+build/
+dist/
+*.egg-info/
+
+# Local/System files
+.DS_Store
+*.log
+yolov8n.pt
+/assets/raw_screenshot.png

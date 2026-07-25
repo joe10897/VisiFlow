@@ -166,16 +166,42 @@ class VisiFlowDetector:
             return 0.0
         return interArea / unionArea
 
-    def run_ocr(self, img_path: str) -> List[Dict[str, Any]]:
+    def run_ocr(self, img_path_or_array: Any, upscale: float = 2.0) -> List[Dict[str, Any]]:
         """
-        Run EasyOCR on the screenshot.
+        Run EasyOCR on the screenshot. Accepts file path string or numpy image array.
+        Applies 2.0x bicubic upscaling and contrast enhancement for superior CJK character recognition.
         """
         if not self.ocr_reader:
             logger.warning("OCR reader is not initialized. Skipping OCR.")
             return []
         
         try:
-            results = self.ocr_reader.readtext(img_path)
+            if isinstance(img_path_or_array, str):
+                img = cv2.imread(img_path_or_array)
+            else:
+                img = img_path_or_array
+
+            if img is None:
+                logger.warning("Invalid image provided to run_ocr.")
+                return []
+
+            # 1. Convert to 2D Grayscale
+            if len(img.shape) == 3:
+                if img.shape[2] == 4:
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)
+                else:
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = img.copy()
+
+            # 2. Upscale image 2.0x using bicubic interpolation (enlarges font stroke details for small CJK text)
+            if upscale != 1.0:
+                h, w = gray.shape[:2]
+                gray_proc = cv2.resize(gray, (int(w * upscale), int(h * upscale)), interpolation=cv2.INTER_CUBIC)
+            else:
+                gray_proc = gray
+
+            results = self.ocr_reader.readtext(gray_proc, contrast_ths=0.1, adjust_contrast=0.5)
             ocr_elements = []
             for item in results:
                 if len(item) == 3:
@@ -186,9 +212,9 @@ class VisiFlowDetector:
                 else:
                     continue
 
-                # bbox is [[x0, y0], [x1, y1], [x2, y2], [x3, y3]]
-                xs = [pt[0] for pt in bbox]
-                ys = [pt[1] for pt in bbox]
+                # Scale coordinates back to original image scale
+                xs = [pt[0] / upscale for pt in bbox]
+                ys = [pt[1] / upscale for pt in bbox]
                 x_min, x_max = int(min(xs)), int(max(xs))
                 y_min, y_max = int(min(ys)), int(max(ys))
                 
@@ -199,15 +225,16 @@ class VisiFlowDetector:
                 })
             return ocr_elements
         except Exception as e:
-            logger.error(f"OCR execution error: {e}")
+            import traceback
+            logger.error(f"OCR execution error: {e}\n{traceback.format_exc()}")
             return []
 
-    def find_element_by_text(self, img_path: str, query_text: str, fuzzy_threshold: float = 0.6) -> Optional[Tuple[int, int]]:
+    def find_element_by_text(self, img_path: str, query_text: str, fuzzy_threshold: float = 0.5) -> Optional[Tuple[int, int]]:
         """
         Find target element coordinates by searching for text, matching with YOLO/OpenCV bounding boxes.
         
         :param img_path: Path to browser screenshot.
-        :param query_text: Target text to look for (e.g. "Submit", "登入").
+        :param query_text: Target text to look for (e.g. "Submit", "登入", "威脅數").
         :param fuzzy_threshold: Levenshtein/Gestalt similarity threshold (0.0 to 1.0).
         :return: Center coordinates (x, y) of the matched element, or None if not found.
         """
@@ -216,26 +243,33 @@ class VisiFlowDetector:
             logger.warning("No OCR text detected.")
             return None
 
-        # 1. Look for fuzzy text match with whitespace normalization (crucial for Chinese/CJK OCR)
+        # 1. Look for fuzzy text match with whitespace normalization & CJK character set overlap
         best_match = None
         best_score = 0.0
         
         query_lower = query_text.lower()
         query_clean = "".join(query_lower.split())
+        query_chars = set(query_clean)
         
         for ocr_item in ocr_results:
             text = ocr_item["text"]
             text_lower = text.lower()
             text_clean = "".join(text_lower.split())
+            text_chars = set(text_clean)
             
             # Substring match (with or without spaces) yields full score
             if query_lower in text_lower or (query_clean and query_clean in text_clean):
                 score = 1.0
             else:
-                # Compare ratio on clean strings
                 score_raw = difflib.SequenceMatcher(None, query_lower, text_lower).ratio()
                 score_clean = difflib.SequenceMatcher(None, query_clean, text_clean).ratio() if query_clean else 0.0
                 score = max(score_raw, score_clean)
+                
+                # CJK character set overlap fallback (handles minor OCR font stroke misrecognitions)
+                if query_chars and text_chars:
+                    overlap_ratio = len(query_chars & text_chars) / len(query_chars)
+                    if overlap_ratio >= 0.5:
+                        score = max(score, overlap_ratio * 0.85)
             
             if score > best_score and score >= fuzzy_threshold:
                 best_score = score
