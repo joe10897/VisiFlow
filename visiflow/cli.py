@@ -28,27 +28,32 @@ def main():
     match_parser.add_argument("image", help="Path to screenshot image file")
     match_parser.add_argument("query", help="Target text query string to find (e.g. 'Submit')")
 
-    args = parser.parse_args()
+    # Clean raw args to prevent wrapper script path artifacts
+    raw_args = sys.argv[1:]
+    while raw_args and ("visiflow" in raw_args[0].lower() or raw_args[0].endswith(".exe")):
+        raw_args = raw_args[1:]
+
+    args = parser.parse_args(raw_args)
 
     if args.command == "server":
-        print(f"🚀 Starting VisiFlow Daemon on http://{args.host}:{args.port}")
+        print(f"Starting VisiFlow Daemon on http://{args.host}:{args.port}")
         uvicorn.run("visiflow.server:app", host=args.host, port=args.port, log_level="info")
     elif args.command == "ui":
         url = f"http://{args.host}:{args.port}/ui"
-        print(f"✨ Opening VisiFlow Web Playground at {url}...")
+        print(f"Opening VisiFlow Web Playground at {url}...")
         webbrowser.open(url)
         uvicorn.run("visiflow.server:app", host=args.host, port=args.port, log_level="info")
     elif args.command == "match":
         img_path = Path(args.image)
         if not img_path.exists():
-            print(f"❌ Error: Image file '{args.image}' does not exist.")
+            print(f"Error: Image file '{args.image}' does not exist.")
             sys.exit(1)
         detector = VisiFlowDetector()
         coords = detector.find_element_by_text(str(img_path), args.query)
         if coords:
-            print(f"✅ Match found for '{args.query}' at coordinates (X: {coords[0]}, Y: {coords[1]})")
+            print(f"Match found for '{args.query}' at coordinates (X: {coords[0]}, Y: {coords[1]})")
         else:
-            print(f"❌ No match found for '{args.query}'")
+            print(f"No match found for '{args.query}'")
     else:
         parser.print_help()
 

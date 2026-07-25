@@ -9,13 +9,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("VisiFlow")
 
 class VisiFlowDetector:
-    def __init__(self, model_path: Optional[str] = "yolov8n.pt", use_yolo: bool = True, languages: List[str] = ["en", "ch_tra"]):
+    def __init__(self, model_path: Optional[str] = "yolov8n.pt", use_yolo: bool = True, languages: List[str] = ["en", "ch_tra", "ch_sim"]):
         """
         Initialize the VisiFlow local visual detector.
         
         :param model_path: Path to the YOLO model file (e.g. yolov8n.pt or a custom UI model pt/onnx).
         :param use_yolo: Whether to attempt loading and running YOLO.
-        :param languages: List of languages for EasyOCR. Defaults to English and Traditional Chinese.
+        :param languages: List of languages for EasyOCR. Defaults to English, Traditional Chinese, and Simplified Chinese.
         """
         self.use_yolo = use_yolo
         self.model = None
@@ -171,7 +171,15 @@ class VisiFlowDetector:
         try:
             results = self.ocr_reader.readtext(img_path)
             ocr_elements = []
-            for (bbox, text, conf) in results:
+            for item in results:
+                if len(item) == 3:
+                    bbox, text, conf = item
+                elif len(item) == 2:
+                    bbox, text = item
+                    conf = 1.0
+                else:
+                    continue
+
                 # bbox is [[x0, y0], [x1, y1], [x2, y2], [x3, y3]]
                 xs = [pt[0] for pt in bbox]
                 ys = [pt[1] for pt in bbox]
@@ -179,7 +187,7 @@ class VisiFlowDetector:
                 y_min, y_max = int(min(ys)), int(max(ys))
                 
                 ocr_elements.append({
-                    "text": text.strip(),
+                    "text": str(text).strip(),
                     "box": [x_min, y_min, x_max, y_max],
                     "confidence": float(conf)
                 })
@@ -202,20 +210,26 @@ class VisiFlowDetector:
             logger.warning("No OCR text detected.")
             return None
 
-        # 1. Look for fuzzy text match
+        # 1. Look for fuzzy text match with whitespace normalization (crucial for Chinese/CJK OCR)
         best_match = None
         best_score = 0.0
         
         query_lower = query_text.lower()
+        query_clean = "".join(query_lower.split())
+        
         for ocr_item in ocr_results:
             text = ocr_item["text"]
             text_lower = text.lower()
+            text_clean = "".join(text_lower.split())
             
-            # Simple substring match yields score of 1.0
-            if query_lower in text_lower:
+            # Substring match (with or without spaces) yields full score
+            if query_lower in text_lower or (query_clean and query_clean in text_clean):
                 score = 1.0
             else:
-                score = difflib.SequenceMatcher(None, query_lower, text_lower).ratio()
+                # Compare ratio on clean strings
+                score_raw = difflib.SequenceMatcher(None, query_lower, text_lower).ratio()
+                score_clean = difflib.SequenceMatcher(None, query_clean, text_clean).ratio() if query_clean else 0.0
+                score = max(score_raw, score_clean)
             
             if score > best_score and score >= fuzzy_threshold:
                 best_score = score
