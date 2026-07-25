@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisiFlow Interactive Playground</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-blue: #38bdf8;
+            --accent-emerald: #34d399;
+            --accent-pink: #f43f5e;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 20px 40px;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            font-size: 2rem;
+        }
+
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(52, 211, 153, 0.15);
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            color: var(--accent-emerald);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-emerald);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-emerald);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        main {
+            flex: 1;
+            padding: 30px 40px;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .stage-card {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 600px;
+            overflow: hidden;
+        }
+
+        .drop-zone {
+            border: 2px dashed rgba(56, 189, 248, 0.4);
+            border-radius: 12px;
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(15, 23, 42, 0.3);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--accent-blue);
+            background: rgba(56, 189, 248, 0.08);
+        }
+
+        .drop-icon {
+            font-size: 3.5rem;
+            margin-bottom: 16px;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            max-width: 100%;
+            max-height: 75vh;
+            overflow: auto;
+            display: none;
+            border-radius: 8px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: white;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent-blue);
+        }
+
+        button.btn-primary {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #38bdf8, #2563eb);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button.btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        button.btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        .legend {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .color-box {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+        }
+
+        .json-viewer {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.82rem;
+            color: #38bdf8;
+            max-height: 250px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            display: none;
+        }
+
+        .spinner {
+            width: 44px;
+            height: 44px;
+            border: 4px solid rgba(56, 189, 248, 0.2);
+            border-left-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-group">
+            <span class="logo-icon">👁️</span>
+            <span class="logo-text">VisiFlow Playground</span>
+        </div>
+        <div class="status-badge">
+            <div class="pulse-dot"></div>
+            <span>Local Engine Active</span>
+        </div>
+    </header>
+
+    <main>
+        <div class="stage-card" id="stage">
+            <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click();">
+                <div class="drop-icon">📸</div>
+                <h3>Drop Screenshot Here</h3>
+                <p style="color: var(--text-muted); margin-top: 8px; font-size: 0.9rem;">or click to upload a webpage image</p>
+                <input type="file" id="file-input" accept="image/*" style="display: none;">
+            </div>
+
+            <div class="canvas-wrapper" id="canvas-wrapper">
+                <canvas id="view-canvas"></canvas>
+            </div>
+
+            <div class="loading-overlay" id="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 16px; font-weight: 600; color: var(--accent-blue);">Running YOLO & OCR Detection...</p>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="card">
+                <div class="card-title">🎯 Natural Language Target Search</div>
+                <div class="input-group">
+                    <input type="text" id="query-input" placeholder="e.g. Submit, Username, 登入">
+                    <button class="btn-primary" onclick="findTarget()">Match</button>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="color-box" style="background: var(--accent-blue);"></div>
+                        <span>UI Elements (YOLO / OpenCV)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-box" style="background: var(--accent-emerald);"></div>
+                        <span>Extracted Text (EasyOCR)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="color-box" style="background: var(--accent-pink);"></div>
+                        <span>Resolved Click Target</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 Detection JSON Output</div>
+                <div class="json-viewer" id="json-output">// Upload a screenshot to see bounding box coordinates</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentImage = null;
+        let detectionData = null;
+        let matchedCoords = null;
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        const canvas = document.getElementById('view-canvas');
+        const ctx = canvas.getContext('2d');
+        const loading = document.getElementById('loading');
+        const jsonOutput = document.getElementById('json-output');
+
+        // Drag & Drop handlers
+        ['dragenter', 'dragover'].forEach(name => {
+            dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        });
+        ['dragleave', 'drop'].forEach(name => {
+            dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+        });
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length) handleFile(files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    runDetection(e.target.result);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function runDetection(base64Data) {
+            loading.style.display = 'flex';
+            matchedCoords = null;
+            
+            try {
+                const formData = new FormData();
+                formData.append('image_base64', base64Data);
+
+                const resp = await fetch('/detect', { method: 'POST', body: formData });
+                detectionData = await resp.json();
+                
+                jsonOutput.textContent = JSON.stringify(detectionData, null, 2);
+                render();
+                dropZone.style.display = 'none';
+                canvasWrapper.style.display = 'block';
+            } catch (err) {
+                alert('Detection failed: ' + err.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        async function findTarget() {
+            const query = document.getElementById('query-input').value.trim();
+            if (!query || !currentImage) return;
+
+            loading.style.display = 'flex';
+            try {
+                const formData = new FormData();
+                formData.append('image_base64', canvas.toDataURL());
+                formData.append('query', query);
+
+                const resp = await fetch('/match', { method: 'POST', body: formData });
+                const result = await resp.json();
+                
+                if (result.found) {
+                    matchedCoords = { x: result.x, y: result.y, query: query };
+                    jsonOutput.textContent = JSON.stringify(result, null, 2);
+                } else {
+                    matchedCoords = null;
+                    alert(`No visual element found for query "${query}"`);
+                }
+                render();
+            } catch (err) {
+                alert('Match failed: ' + err.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function render() {
+            if (!currentImage) return;
+
+            canvas.width = currentImage.width;
+            canvas.height = currentImage.height;
+
+            // Draw original screenshot
+            ctx.drawImage(currentImage, 0, 0);
+
+            if (!detectionData) return;
+
+            // 1. Draw UI element bounding boxes (Cyan)
+            if (detectionData.elements) {
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#38bdf8';
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+
+                detectionData.elements.forEach(elem => {
+                    const [x1, y1, x2, y2] = elem.box;
+                    const w = x2 - x1;
+                    const h = y2 - y1;
+                    ctx.fillRect(x1, y1, w, h);
+                    ctx.strokeRect(x1, y1, w, h);
+                });
+            }
+
+            // 2. Draw OCR bounding boxes & texts (Emerald)
+            if (detectionData.ocr) {
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#34d399';
+                ctx.fillStyle = 'rgba(52, 211, 153, 0.8)';
+                ctx.font = '14px Outfit, sans-serif';
+
+                detectionData.ocr.forEach(item => {
+                    const [x1, y1, x2, y2] = item.box;
+                    const w = x2 - x1;
+                    const h = y2 - y1;
+                    ctx.strokeRect(x1, y1, w, h);
+                    ctx.fillText(item.text, x1, Math.max(12, y1 - 4));
+                });
+            }
+
+            // 3. Highlight matched target (Pink Circle & Crosshair)
+            if (matchedCoords) {
+                const { x, y } = matchedCoords;
+                
+                ctx.beginPath();
+                ctx.arc(x, y, 18, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(244, 63, 94, 0.4)';
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#f43f5e';
+                ctx.stroke();
+
+                // Crosshair
+                ctx.beginPath();
+                ctx.moveTo(x - 8, y); ctx.lineTo(x + 8, y);
+                ctx.moveTo(x, y - 8); ctx.lineTo(x, y + 8);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+    </script>
+</body>
+</html>

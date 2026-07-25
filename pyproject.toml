@@ -31,3 +31,6 @@ selenium = ["selenium>=4.0.0"]
 [project.urls]
 Homepage = "https://github.com/yourusername/VisiFlow"
 Issues = "https://github.com/yourusername/VisiFlow/issues"
+
+[project.scripts]
+visiflow = "visiflow.cli:main"

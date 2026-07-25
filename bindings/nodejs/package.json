@@ -1,0 +1,26 @@
+{
+  "name": "visiflow-js",
+  "version": "0.1.0",
+  "description": "Node.js & Playwright bindings for VisiFlow: Fast local visual E2E automation testing.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node example.js"
+  },
+  "keywords": [
+    "playwright",
+    "automation",
+    "visual-testing",
+    "e2e",
+    "visiflow",
+    "yolo",
+    "ocr"
+  ],
+  "author": "VisiFlow Team",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "peerDependencies": {
+    "playwright": "^1.30.0"
+  }
+}

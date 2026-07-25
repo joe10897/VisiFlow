@@ -1,37 +1,47 @@
 # 👁️ VisiFlow
 
 [![PyPI version](https://img.shields.io/pypi/v/visiflow.svg)](https://pypi.org/project/visiflow/)
+[![npm version](https://img.shields.io/npm/v/visiflow-js.svg)](https://www.npmjs.com/package/visiflow-js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Supported Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-blue.svg)]()
 
-**VisiFlow** is a fast, local, zero-cloud-dependency visual-driven E2E automation testing plugin for **Playwright** and **Selenium**. 
+**VisiFlow** is a fast, 100% local, visual-driven E2E automation testing framework for **Python** and **Node.js (TypeScript/JavaScript)** ecosystem, built for **Playwright** and **Selenium**.
 
 It challenges traditional web automation by throwing away fragile HTML DOM selectors (XPath, IDs, CSS classes) and replacing them with a local computer vision pipeline (YOLO + EasyOCR) to locate and interact with elements exactly how a human does.
 
+![VisiFlow Visual Banner](assets/visiflow_demo_banner.png)
+
 ---
 
-## 🚀 Why VisiFlow?
+## ⚡ Comparison: Why VisiFlow? (方案 B)
 
-* **Zero-Maintenance Tests**: Say goodbye to broken tests caused by front-end refactoring, CSS changes, or ID updates. If it *looks* like a login button and says "Login", VisiFlow will find it.
-* **100% Local & Private**: Runs on your local machine using YOLOv8/11/26 and EasyOCR. No files are uploaded to external APIs, ensuring zero latency, zero cloud costs, and complete privacy.
-* **Sub-300ms Inference**: Optimized single-pass screenshot detection matching YOLO boundaries with OCR boxes in milliseconds.
-* **Seamless Integration**: Drop-in wrapper that extends your existing Playwright and Selenium suites with a single line of code.
+| Metric / Feature | Traditional DOM Selectors (XPath/CSS) | Cloud AI Automation (GPT-4o Vision API) | **VisiFlow (Our Local Core)** |
+| :--- | :--- | :--- | :--- |
+| **Maintenance Cost** | 🔴 Extremely High (Breaks on CSS/ID refactoring) | 🟢 Extremely Low (Zero selector maintenance) | 🟢 **Zero Maintenance (Visual-driven)** |
+| **Execution Cost** | 🟢 $0 / Free | 🔴 Expensive ($0.01+ per screenshot query) | 🟢 **$0 / 100% Free Local Execution** |
+| **Latency** | 🟢 < 10ms | 🔴 1.5s - 4.0s (Cloud latency & queues) | 🟡 **100ms - 250ms (Sub-second local CV)** |
+| **Data Privacy** | 🟢 100% On-Premise | 🔴 Privacy Risks (Sends UI to external servers) | 🟢 **100% On-Premise & Private (Offline)** |
+| **Ecosystem Support**| Python, JS/TS, Java | Vendor locked APIs | 🟢 **Python & Node.js (Playwright + Selenium)** |
 
 ---
 
 ## 📦 Installation
 
+### Python Package (PyPI)
 ```bash
 pip install "visiflow[playwright,selenium]"
 ```
 
-*Note: The first time VisiFlow runs, it will automatically download lightweight local model weights (~60MB total) for YOLO and OCR detection. Subsequent runs will load instantly.*
+### Node.js Package (npm)
+```bash
+npm install visiflow-js
+```
 
 ---
 
-## ⚡ Quick Start
+## 💻 Quick Start
 
-### 🎭 With Playwright
+### 1. Python + Playwright
 
 ```python
 from playwright.sync_api import sync_playwright
@@ -42,62 +52,73 @@ with sync_playwright() as p:
     page = browser.new_page()
     page.goto("https://example.com/login")
 
-    # Wrap the standard Playwright page
+    # Wrap Playwright Page
     visipage = VisiPlaywrightPage(page)
 
-    # Automate visually using natural labels!
-    visipage.visual_fill("Username", "admin")
-    visipage.visual_fill("Password", "secret123")
+    # Visual automation via natural language text labels!
+    visipage.visual_fill("Username", "admin_user")
+    visipage.visual_fill("Password", "secret_pass")
     visipage.visual_click("Submit")
 
-    # Verify results visually
+    # Verify visually
     if visipage.visual_wait_for("Welcome back!"):
-        print("Login Success!")
-        
+        print("Logged in successfully!")
+
     browser.close()
 ```
 
-### 🌐 With Selenium
+### 2. Node.js (JavaScript / TypeScript) + Playwright
 
-```python
-from selenium import webdriver
-from visiflow import VisiSeleniumDriver
+First, start the local VisiFlow daemon server in your terminal:
+```bash
+visiflow server
+```
 
-driver = webdriver.Chrome()
-driver.get("https://example.com/login")
+Then in your JavaScript/TypeScript Playwright script:
+```javascript
+const { chromium } = require('playwright');
+const { VisiPage } = require('visiflow-js');
 
-# Wrap the standard Selenium webdriver
-visidriver = VisiSeleniumDriver(driver)
+(async () => {
+    const browser = await chromium.launch();
+    const page = await browser.newPage();
+    await page.goto('https://example.com/login');
 
-# Automate visually!
-visidriver.visual_fill("Username", "admin")
-visidriver.visual_click("Submit")
+    // Wrap JS Playwright Page
+    const visipage = new VisiPage(page);
 
-driver.quit()
+    // Visual actions in JS!
+    await visipage.visualFill('Username', 'js_developer');
+    await visipage.visualClick('Submit');
+
+    await browser.close();
+})();
 ```
 
 ---
 
-## 🧠 How it Works
+## 🎨 Interactive Web Playground (方案 C)
 
-VisiFlow processes browser automation in a 3-step pipeline:
+Want to test VisiFlow's object detection & text matching on your webpage screenshots before writing tests? Launch the built-in interactive Web UI:
 
-```mermaid
-graph TD
-    A[Browser Screenshot] --> B[YOLOv8/11: Local Object Detection]
-    A --> C[EasyOCR: Full Screen Text Extraction]
-    B --> D[Semantic Matcher]
-    C --> D
-    D -->|Fuzzy Levenshtein Match| E[Calculate Viewport Coordinates]
-    E --> F[Playwright/Selenium Actions]
+```bash
+visiflow ui
 ```
 
-1. **Local Object Detection**: A lightweight YOLO model identifies potential clickable boundaries (buttons, inputs, dropdowns) directly from browser screenshots.
-2. **Text Anchoring**: Local OCR extracts text labels. If a user requests `"Login"`, fuzzy Levenshtein matching aligns it even if OCR yields minor reading anomalies (like `"Log1n"`).
-3. **Smart Click Projection**: The resolved text center is projected into the closest YOLO/OpenCV container bounding box, clicking the exact center of the interactive button.
+This opens `http://localhost:8000/ui` in your browser, where you can drag & drop any screenshot image to inspect bounding boxes and test queries live in real-time!
+
+---
+
+## 🛠️ CLI Reference
+
+VisiFlow comes with a CLI tool:
+
+- `visiflow server [--port 8000]`: Start the local HTTP vision daemon.
+- `visiflow ui`: Launch the interactive Web Playground UI in your browser.
+- `visiflow match <screenshot_path> <query>`: Test matching query coordinates directly from terminal.
 
 ---
 
 ## 🛡️ License
 
-VisiFlow is open-source and licensed under the MIT License.
+MIT License. Built for global open-source developers.
