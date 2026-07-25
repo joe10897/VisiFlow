@@ -13,7 +13,7 @@ It challenges traditional web automation by throwing away fragile HTML DOM selec
 
 ---
 
-## ⚡ Comparison: Why VisiFlow? (方案 B)
+## ⚡ Comparison: Why VisiFlow?
 
 | Metric / Feature | Traditional DOM Selectors (XPath/CSS) | Cloud AI Automation (GPT-4o Vision API) | **VisiFlow (Our Local Core)** |
 | :--- | :--- | :--- | :--- |
@@ -97,7 +97,7 @@ const { VisiPage } = require('visiflow-js');
 
 ---
 
-## 🎨 Interactive Web Playground (方案 C)
+## 🎨 Interactive Web Playground
 
 Want to test VisiFlow's object detection & text matching on your webpage screenshots before writing tests? Launch the built-in interactive Web UI:
 
