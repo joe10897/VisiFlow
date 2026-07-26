@@ -47,7 +47,7 @@ npm install visiflow-js
 
 ```python
 from playwright.sync_api import sync_playwright
-from visiflow import VisiPlaywrightPage
+from visiflow import VisiPlaywrightPage, global_reporter
 
 with sync_playwright() as p:
     browser = p.chromium.launch()
@@ -62,14 +62,43 @@ with sync_playwright() as p:
     visipage.visual_fill("Password", "secret_pass")
     visipage.visual_click("Submit")
 
-    # Verify visually
-    if visipage.visual_wait_for("Welcome back!"):
-        print("Logged in successfully!")
+    # Visual Assertions — verify what is on screen, not in the DOM
+    visipage.visual_assert_visible("Welcome back!")
+    visipage.visual_assert_not_visible("Invalid credentials")
+
+    # Generate self-healing HTML report
+    global_reporter.generate_html_report("visiflow_report.html")
 
     browser.close()
 ```
 
-### 2. Node.js (JavaScript / TypeScript) + Playwright
+### 2. Python + Selenium
+
+```python
+from selenium import webdriver
+from visiflow import VisiSeleniumDriver, global_reporter
+
+driver = webdriver.Chrome()
+driver.get("https://example.com/login")
+
+# Wrap Selenium WebDriver
+visi = VisiSeleniumDriver(driver)
+
+# Visual automation — same API, works with Selenium too!
+visi.visual_fill("Username", "admin_user")
+visi.visual_fill("Password", "secret_pass")
+visi.visual_click("Submit")
+
+# Visual Assertions
+visi.visual_assert_visible("Welcome back!")
+
+# Generate self-healing HTML report
+global_reporter.generate_html_report("visiflow_report.html")
+
+driver.quit()
+```
+
+### 3. Node.js (JavaScript / TypeScript) + Playwright
 
 First, start the local VisiFlow daemon server in your terminal:
 ```bash
@@ -91,11 +120,88 @@ const { VisiPage } = require('visiflow-js');
 
     // Visual actions in JS!
     await visipage.visualFill('Username', 'js_developer');
+    await visipage.visualFill('Password', 'secure_pass');
     await visipage.visualClick('Submit');
+
+    // Visual Assertions in JS!
+    await visipage.visualAssertVisible('Welcome back!');
+    await visipage.visualAssertNotVisible('Invalid credentials');
 
     await browser.close();
 })();
 ```
+
+---
+
+## ✅ Visual Assertions API
+
+VisiFlow provides visual assertion methods that verify UI state **purely by what is rendered on screen** — no DOM selectors needed.
+
+| Method | Description |
+| :--- | :--- |
+| `visual_assert_visible(text, timeout_ms)` | Assert that an element with the given text **is visible** on screen. Raises `AssertionError` on timeout. |
+| `visual_assert_not_visible(text, timeout_ms)` | Assert that an element with the given text **is NOT visible** on screen. Raises `AssertionError` if still found. |
+| `visual_wait_for(text, timeout_ms)` | Wait for an element to become visually present. Returns `True` when found. |
+
+**Python Example:**
+```python
+# After clicking "Delete Account"
+visipage.visual_assert_not_visible("My Profile")       # profile section should disappear
+visipage.visual_assert_visible("Account deleted")       # success message should appear
+```
+
+**Node.js Example:**
+```javascript
+await visipage.visualAssertVisible('Dashboard');
+await visipage.visualAssertNotVisible('Loading...');
+```
+
+---
+
+## 📊 Self-Healing HTML Test Reports
+
+VisiFlow automatically records every visual action (click, fill, assert) with before/after screenshots and OCR match scores. When the engine uses **fuzzy matching** to recover from a minor text change (e.g., a button label changed from `"Sign In"` to `"Log In"`), it flags the step as **"Self-Healed"** in the report.
+
+### Generate a Report
+
+```python
+from visiflow import global_reporter
+
+# After running your test steps...
+global_reporter.generate_html_report("visiflow_report.html")
+```
+
+The report is a **fully self-contained HTML file** (all screenshots embedded as Base64) that you can open in any browser. It includes:
+
+- **Dashboard Metrics**: Total steps, success/fail/healed counts, and total duration.
+- **Step-by-Step Timeline**: Each action with its OCR match score, status badge, and duration.
+- **Self-Healing Log**: When fuzzy matching was used, the report shows exactly what text was queried vs. what was matched and the similarity score.
+- **Before/After Screenshots**: Visual comparison of the page state before and after each action.
+
+---
+
+## ⏺️ No-Code Script Recorder (Web Playground)
+
+VisiFlow's built-in Web Playground includes a **Script Recorder** that lets you generate test scripts without writing any code.
+
+### How to Use
+
+1. Launch the Web Playground:
+   ```bash
+   visiflow ui
+   ```
+
+2. Upload or drag & drop a screenshot of your web application.
+
+3. Toggle **"Enable Recording"** in the Script Recorder panel on the right sidebar.
+
+4. **Click on any detected element** (green OCR text boxes or blue UI element boxes) on the canvas:
+   - Clicking a **button/link** automatically generates a `visual_click()` call.
+   - Clicking an **input field** prompts you for a text value and generates a `visual_fill()` call.
+
+5. Switch between **Python** and **JavaScript** output using the language dropdown.
+
+6. Click **Copy** to copy the generated script to your clipboard, ready to paste into your test file!
 
 ---
 
@@ -104,8 +210,10 @@ const { VisiPage } = require('visiflow-js');
 Why write automation scripts using VisiFlow's visual engine?
 
 - **Zero DOM Selector Maintenance**: Web applications get refactored frequently. Standard Selenium/Playwright scripts break the moment an ID, class name, or HTML structure changes (e.g. `<button>` changes to a `<div>`). VisiFlow locates elements visually. If the screen says **"指標"** or **"Submit"** and looks like a button, VisiFlow will find it and click it.
+- **CJK Multilingual Support**: Built-in 2× bicubic upscaling and grayscale preprocessing optimized for Chinese/Japanese/Korean character recognition. Character-set overlap matching handles minor OCR stroke misrecognitions gracefully.
 - **DPR Auto-Scaling Protection**: Modern test suites run on screens with different Device Pixel Ratios (DPR) (e.g. 1.0x on Docker containers vs 2.0x Retina displays on macOS). VisiFlow transparently scales all vision coordinates back to original viewport mouse spaces, making click scripts fully cross-platform and portable.
 - **Sub-Second Performance & 100% Privacy**: Unlike cloud-based AI automation APIs (e.g. GPT-4o Vision) which introduce 3-second network latency and raise data privacy concerns, VisiFlow runs completely locally on CPU/GPU.
+- **ONNX Runtime Support**: Export your YOLO model to ONNX format for lightning-fast CPU inference without requiring PyTorch at runtime — ideal for lightweight CI/CD containers.
 
 ---
 
@@ -117,7 +225,10 @@ Want to test VisiFlow's object detection & text matching on your webpage screens
 visiflow ui
 ```
 
-This opens `http://localhost:8000/ui` in your browser, where you can drag & drop any screenshot image to inspect bounding boxes and test queries live in real-time!
+This opens `http://localhost:8000/ui` in your browser, where you can:
+- **Drag & drop** any screenshot image to inspect bounding boxes and test queries live in real-time.
+- **Search by text** using natural language (e.g., "Submit", "登入") to find and highlight target elements.
+- **Record scripts** using the built-in Script Recorder to generate Python or JS automation code by clicking on detected elements.
 
 ---
 
@@ -128,6 +239,32 @@ VisiFlow comes with a CLI tool:
 - `visiflow server [--port 8000]`: Start the local HTTP vision daemon.
 - `visiflow ui`: Launch the interactive Web Playground UI in your browser.
 - `visiflow match <screenshot_path> <query>`: Test matching query coordinates directly from terminal.
+
+---
+
+## 🔧 Full API Reference
+
+### Python API
+
+| Class | Method | Description |
+| :--- | :--- | :--- |
+| `VisiPlaywrightPage` | `visual_click(text, timeout_ms=10000)` | Click an element by its visible text label |
+| | `visual_fill(text, value, timeout_ms=10000)` | Fill an input field located by visible text |
+| | `visual_wait_for(text, timeout_ms=10000)` | Wait for text to become visible |
+| | `visual_assert_visible(text, timeout_ms=10000)` | Assert text is visible on screen |
+| | `visual_assert_not_visible(text, timeout_ms=5000)` | Assert text is NOT visible on screen |
+| `VisiSeleniumDriver` | *(Same API as above)* | Works with Selenium WebDriver |
+| `global_reporter` | `generate_html_report(output_path)` | Generate self-healing HTML test report |
+
+### Node.js API (`visiflow-js`)
+
+| Class | Method | Description |
+| :--- | :--- | :--- |
+| `VisiPage` | `visualClick(text, timeoutMs=10000)` | Click an element by visible text |
+| | `visualFill(text, value, timeoutMs=10000)` | Fill an input field by visible text |
+| | `visualWaitFor(text, timeoutMs=10000)` | Wait for text to become visible |
+| | `visualAssertVisible(text, timeoutMs=10000)` | Assert text is visible |
+| | `visualAssertNotVisible(text, timeoutMs=5000)` | Assert text is NOT visible |
 
 ---
 

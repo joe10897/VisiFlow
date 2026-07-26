@@ -21,6 +21,7 @@ class VisiFlowDetector:
         self.model = None
         self.ocr_reader = None
         self.languages = languages
+        self.last_match = None
         self._init_yolo(model_path)
         self._init_ocr()
 
@@ -229,7 +230,7 @@ class VisiFlowDetector:
             logger.error(f"OCR execution error: {e}\n{traceback.format_exc()}")
             return []
 
-    def find_element_by_text(self, img_path: str, query_text: str, fuzzy_threshold: float = 0.5) -> Optional[Tuple[int, int]]:
+    def find_element_by_text(self, img_path: str, query_text: str, fuzzy_threshold: float = 0.6) -> Optional[Tuple[int, int]]:
         """
         Find target element coordinates by searching for text, matching with YOLO/OpenCV bounding boxes.
         
@@ -266,7 +267,9 @@ class VisiFlowDetector:
                 score = max(score_raw, score_clean)
                 
                 # CJK character set overlap fallback (handles minor OCR font stroke misrecognitions)
-                if query_chars and text_chars:
+                # Only apply to queries containing CJK characters to prevent English alphabet overlap false positives
+                is_cjk = any(0x4e00 <= ord(c) <= 0x9fff for c in query_clean)
+                if is_cjk and query_chars and text_chars:
                     overlap_ratio = len(query_chars & text_chars) / len(query_chars)
                     if overlap_ratio >= 0.5:
                         score = max(score, overlap_ratio * 0.85)
@@ -277,9 +280,25 @@ class VisiFlowDetector:
 
         if not best_match:
             logger.warning(f"No text match found for query: '{query_text}' (best score was below threshold {fuzzy_threshold})")
+            self.last_match = {
+                "found": False,
+                "query": query_text,
+                "score": 0.0,
+                "matched_text": "",
+                "healed": False
+            }
             return None
         
         logger.info(f"Matched text '{best_match['text']}' for query '{query_text}' with score {best_score:.2f}")
+        # Self-healing is true when the match isn't an exact match (score < 1.0) but satisfies fuzzy threshold
+        healed = best_score < 1.0
+        self.last_match = {
+            "found": True,
+            "query": query_text,
+            "score": best_score,
+            "matched_text": best_match["text"],
+            "healed": healed
+        }
         
         # 2. Get the bounding box of matched text
         txt_box = best_match["box"] # [x_min, y_min, x_max, y_max]

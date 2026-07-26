@@ -333,6 +333,24 @@
             </div>
 
             <div class="card">
+                <div class="card-title">⏺️ Script Recorder</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; color: var(--text-main);">
+                        <input type="checkbox" id="recorder-toggle" onchange="toggleRecorder()"> Enable Recording
+                    </label>
+                    <select id="recorder-lang" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); color: white; border-radius: 4px; padding: 4px; font-size: 0.85rem;" onchange="updateRecorderOutput()">
+                        <option value="python">Python</option>
+                        <option value="javascript">JavaScript</option>
+                    </select>
+                </div>
+                <textarea id="recorder-code" readonly style="width: 100%; height: 150px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #34d399; resize: none; margin-bottom: 10px;" placeholder="// Turn on recording and click elements on the image above to generate code..."></textarea>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-primary" style="flex: 1; padding: 8px 12px; font-size: 0.85rem;" onclick="copyRecordedCode()">Copy</button>
+                    <button class="btn-primary" style="flex: 1; padding: 8px 12px; font-size: 0.85rem; background: linear-gradient(135deg, #f43f5e, #be123c);" onclick="clearRecordedSteps()">Clear</button>
+                </div>
+            </div>
+
+            <div class="card">
                 <div class="card-title">📊 Detection JSON Output</div>
                 <div class="json-viewer" id="json-output">// Upload a screenshot to see bounding box coordinates</div>
             </div>
@@ -493,6 +511,126 @@
                 ctx.stroke();
             }
         }
+
+        // Script Recorder Logic
+        let recordedSteps = [];
+        let isRecording = false;
+
+        function toggleRecorder() {
+            isRecording = document.getElementById('recorder-toggle').checked;
+            if (isRecording) {
+                alert('Recording Mode Enabled! Click any labeled text or button bounding box on the image to record automation actions.');
+            }
+        }
+
+        function clearRecordedSteps() {
+            recordedSteps = [];
+            updateRecorderOutput();
+        }
+
+        function copyRecordedCode() {
+            const codeArea = document.getElementById('recorder-code');
+            codeArea.select();
+            document.execCommand('copy');
+            alert('Recorded script copied to clipboard!');
+        }
+
+        function updateRecorderOutput() {
+            const lang = document.getElementById('recorder-lang').value;
+            let code = "";
+            if (lang === 'python') {
+                code = "# VisiFlow Python Playwright Automation Script\n";
+                code += "from playwright.sync_api import sync_playwright\n";
+                code += "from visiflow import VisiPlaywrightPage, global_reporter\n\n";
+                code += "with sync_playwright() as p:\n";
+                code += "    browser = p.chromium.launch(headless=False)\n";
+                code += "    page = browser.new_page()\n";
+                code += "    page.goto('YOUR_PAGE_URL')\n";
+                code += "    v = VisiPlaywrightPage(page)\n\n";
+                
+                recordedSteps.forEach(s => {
+                    if (s.action === 'click') {
+                        code += `    v.visual_click('${s.target}')\n`;
+                    } else if (s.action === 'fill') {
+                        code += `    v.visual_fill('${s.target}', '${s.value}')\n`;
+                    }
+                });
+                code += "\n    # Generate self-healing HTML report\n";
+                code += "    global_reporter.generate_html_report('visiflow_report.html')\n";
+                code += "    browser.close()\n";
+            } else {
+                code = "// VisiFlow Node.js Playwright Automation Script\n";
+                code += "const { chromium } = require('playwright');\n";
+                code += "const { VisiPage } = require('visiflow-js');\n\n";
+                code += "(async () => {\n";
+                code += "    const browser = await chromium.launch({ headless: false });\n";
+                code += "    const page = await browser.newPage();\n";
+                code += "    await page.goto('YOUR_PAGE_URL');\n";
+                code += "    const v = new VisiPage(page);\n\n";
+                
+                recordedSteps.forEach(s => {
+                    if (s.action === 'click') {
+                        code += `    await v.visualClick('${s.target}');\n`;
+                    } else if (s.action === 'fill') {
+                        code += `    await v.visualFill('${s.target}', '${s.value}');\n`;
+                    }
+                });
+                code += "\n    await browser.close();\n";
+                code += "})();\n";
+            }
+            document.getElementById('recorder-code').value = code;
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (!isRecording || !detectionData) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.round((e.clientX - rect.left) * (canvas.width / rect.width));
+            const y = Math.round((e.clientY - rect.top) * (canvas.height / rect.height));
+
+            let targetText = "";
+            
+            // Find if click falls in OCR text box
+            if (detectionData.ocr) {
+                for (let ocr of detectionData.ocr) {
+                    const [x1, y1, x2, y2] = ocr.box;
+                    if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+                        targetText = ocr.text;
+                        break;
+                    }
+                }
+            }
+
+            // Fallback to YOLO/OpenCV elements
+            if (!targetText && detectionData.elements) {
+                for (let el of detectionData.elements) {
+                    const [x1, y1, x2, y2] = el.box;
+                    if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+                        targetText = el.label === "ui_element" ? "Input/Button" : el.label;
+                        break;
+                    }
+                }
+            }
+
+            if (!targetText) {
+                targetText = prompt("No specific text matched at click coordinates. Enter label text for this step manually:", "Button");
+            }
+
+            if (targetText) {
+                const lowerText = targetText.toLowerCase();
+                const isInput = lowerText.includes('username') || lowerText.includes('password') || lowerText.includes('input') || lowerText.includes('email') || lowerText.includes('search');
+                
+                if (isInput) {
+                    const val = prompt(`Fill action detected for target "${targetText}". Enter text value to type:`, "");
+                    if (val !== null) {
+                        recordedSteps.push({ action: 'fill', target: targetText, value: val });
+                    }
+                } else {
+                    recordedSteps.push({ action: 'click', target: targetText });
+                }
+                updateRecorderOutput();
+            }
+        });
     </script>
 </body>
 </html>

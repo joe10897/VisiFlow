@@ -84,6 +84,29 @@ class VisiPage {
         }
         throw new Error(`[VisiFlow-JS] Timed out waiting for visual element '${textOrLabel}'`);
     }
+
+    async visualAssertVisible(textOrLabel, timeoutMs = 10000) {
+        try {
+            await this.visualWaitFor(textOrLabel, timeoutMs);
+            console.log(`[VisiFlow-JS] Assertion PASSED: Element '${textOrLabel}' is visible.`);
+            return true;
+        } catch (err) {
+            throw new Error(`[VisiFlow-JS] Assertion FAILED: Element '${textOrLabel}' is not visible. Error: ${err.message}`);
+        }
+    }
+
+    async visualAssertNotVisible(textOrLabel, timeoutMs = 5000) {
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+            const coords = await this._resolveCoordinates(textOrLabel);
+            if (!coords) {
+                console.log(`[VisiFlow-JS] Assertion PASSED: Element '${textOrLabel}' is not visible.`);
+                return true;
+            }
+            await new Promise(r => setTimeout(r, 500));
+        }
+        throw new Error(`[VisiFlow-JS] Assertion FAILED: Element '${textOrLabel}' is still visible after ${timeoutMs}ms`);
+    }
 }
 
 module.exports = { VisiPage };
