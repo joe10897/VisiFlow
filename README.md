@@ -270,4 +270,4 @@ VisiFlow comes with a CLI tool:
 
 ## 🛡️ License
 
-MIT License. Built for global open-source developers.
+MIT License © 2026 [Simon Wong](https://github.com/joe10897). See [LICENSE](LICENSE) for details.
