@@ -46,7 +46,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Publish to npm
-        cwd: ./bindings/nodejs
+        working-directory: ./bindings/nodejs
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
