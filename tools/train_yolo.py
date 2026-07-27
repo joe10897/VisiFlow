@@ -22,13 +22,16 @@ def train_and_export_ui_model(dataset_yaml_path: str, epochs: int = 50, imgsz: i
     print(f"\n=== Step 2: Training on Dataset: {dataset_yaml_path} ===")
     print(f"Parameters: Epochs={epochs}, Image Size={imgsz}")
     
+    import torch
+    device = 0 if torch.cuda.is_available() else "cpu"
+    
     # Train the model. It's recommended to run this on a GPU (CUDA) enabled environment.
     model.train(
         data=dataset_yaml_path,
         epochs=epochs,
         imgsz=imgsz,
         batch=16,
-        device="0" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cpu",
+        device=device,
         workers=4,
         verbose=True
     )
