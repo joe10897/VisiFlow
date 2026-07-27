@@ -25,3 +25,12 @@ dist/
 *.log
 yolov8n.pt
 /assets/raw_screenshot.png
+
+# YOLO Datasets and training models
+train/
+valid/
+test/
+data.yaml
+*.pt
+*.onnx
+runs/
