@@ -1,9 +1,9 @@
 # 👁️ VisiFlow
 
-[![PyPI version](https://img.shields.io/pypi/v/visiflow.svg)](https://pypi.org/project/visiflow/0.1.0/)
-[![PyPI Release](https://img.shields.io/badge/PyPI-v0.1.0-blue?logo=pypi&logoColor=white)](https://pypi.org/project/visiflow/0.1.0/)
-[![npm Release](https://img.shields.io/badge/npm-v0.1.0-red?logo=npm&logoColor=white)](https://www.npmjs.com/package/visiflow-js)
+[![PyPI version](https://img.shields.io/pypi/v/visiflow.svg)](https://pypi.org/project/visiflow/)
+[![PyPI Release](https://img.shields.io/badge/PyPI-v0.2.0-blue?logo=pypi&logoColor=white)](https://pypi.org/project/visiflow/)
 [![npm version](https://img.shields.io/npm/v/visiflow-js.svg)](https://www.npmjs.com/package/visiflow-js)
+[![npm Release](https://img.shields.io/badge/npm-v0.2.0-red?logo=npm&logoColor=white)](https://www.npmjs.com/package/visiflow-js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Supported Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-blue.svg)]()
 
@@ -29,12 +29,12 @@ It challenges traditional web automation by throwing away fragile HTML DOM selec
 
 ## 📦 Installation
 
-### Python Package ([PyPI v0.1.0](https://pypi.org/project/visiflow/0.1.0/))
+### Python Package ([PyPI v0.2.0](https://pypi.org/project/visiflow/))
 ```bash
 pip install "visiflow[playwright,selenium]"
 ```
 
-### Node.js Package ([npm v0.1.0](https://www.npmjs.com/package/visiflow-js))
+### Node.js Package ([npm v0.2.0](https://www.npmjs.com/package/visiflow-js))
 ```bash
 npm install visiflow-js
 ```
