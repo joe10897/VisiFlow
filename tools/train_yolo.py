@@ -26,11 +26,12 @@ def train_and_export_ui_model(dataset_yaml_path: str, epochs: int = 50, imgsz: i
     device = 0 if torch.cuda.is_available() else "cpu"
     
     # Train the model. It's recommended to run this on a GPU (CUDA) enabled environment.
+    # We use batch=4 to avoid CUDA Out of Memory (OOM) on consumer GPUs with 1024x1024 resolution.
     model.train(
         data=dataset_yaml_path,
         epochs=epochs,
         imgsz=imgsz,
-        batch=16,
+        batch=4,
         device=device,
         workers=4,
         verbose=True
