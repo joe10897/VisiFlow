@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("VisiFlow")
 
 class VisiFlowDetector:
-    def __init__(self, model_path: Optional[str] = "yolov8n.pt", use_yolo: bool = True, languages: List[str] = ["ch_tra", "en"]):
+    def __init__(self, model_path: Optional[str] = None, use_yolo: bool = True, languages: List[str] = ["ch_tra", "en"]):
         """
         Initialize the VisiFlow local visual detector.
         
@@ -29,6 +29,13 @@ class VisiFlowDetector:
         if not self.use_yolo:
             logger.info("YOLO is disabled by user configuration.")
             return
+        
+        if model_path is None:
+            # Check if local yolo26n.onnx exists, else fallback
+            if os.path.exists("yolo26n.onnx"):
+                model_path = "yolo26n.onnx"
+            else:
+                model_path = "yolov8n.pt"
         
         try:
             from ultralytics import YOLO
