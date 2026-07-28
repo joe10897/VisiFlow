@@ -314,13 +314,24 @@ class VisiFlowDetector:
                     img_h, img_w = img_raw.shape[:2]
                     ui_elements = self.detect_elements(img_path)
                     
-                    # Determine the shape profile expected for this kind of query
-                    input_keywords  = {"search", "bar", "box", "input", "text", "form", "area", "field"}
-                    button_keywords = {"button", "btn", "submit", "ok", "cancel"}
+                    # Keyword sets that indicate the user wants to interact with an input-like element.
+                    # "fill" and "type" are action words the user might accidentally use as targets.
+                    input_keywords  = {
+                        "search", "bar", "box", "input", "text", "form", "area", "field",
+                        "fill", "type", "enter", "textarea", "query", "keyword"
+                    }
+                    button_keywords = {
+                        "button", "btn", "submit", "ok", "cancel", "click", "press", "link",
+                        "tab", "action", "go"
+                    }
                     
                     query_words = set(query_clean_lower.replace("_", " ").split())
                     wants_input  = bool(query_words & input_keywords)
                     wants_button = bool(query_words & button_keywords)
+                    
+                    # If query is ambiguous (neither input nor button), default to input
+                    if not wants_input and not wants_button:
+                        wants_input = True
                     
                     best_shape_match = None
                     best_shape_score = -1
@@ -334,27 +345,44 @@ class VisiFlowDetector:
                         ar = w / h  # Aspect ratio
                         cx = (box[0] + box[2]) / 2
                         cy = (box[1] + box[3]) / 2
+                        cy_ratio = cy / img_h
                         
                         score = 0
                         
                         if wants_input:
-                            # Input fields: wide & horizontal (AR > 3), typically in middle third of page
+                            # Input fields: wide & horizontal (AR > 3)
                             if ar >= 3:
-                                score += int(min(ar, 20))  # Wider = more likely to be an input bar
+                                score += int(min(ar, 20))   # Wider = more likely to be an input bar
                             if ar >= 5:
-                                score += 10  # Extra bonus for very wide elements
+                                score += 10                  # Extra bonus for very wide elements
                             # Centered horizontally (Google search bar is centred)
                             center_dist = abs(cx / img_w - 0.5)
-                            if center_dist < 0.2:
-                                score += 8
-                            # Not too close to screen edges vertically
-                            if 0.1 < (cy / img_h) < 0.85:
-                                score += 5
+                            if center_dist < 0.25:
+                                score += 10
+                            elif center_dist < 0.4:
+                                score += 4
+                            # PREFER elements in the middle vertical range (20-75% of page height)
+                            # PENALISE top navigation bars (< 12% height) which are wider but wrong
+                            if 0.20 <= cy_ratio <= 0.75:
+                                score += 12   # Strong bonus: this is where search boxes live
+                            elif 0.12 <= cy_ratio < 0.20:
+                                score += 4
+                            elif cy_ratio < 0.12:
+                                score -= 8    # Penalty: very likely a nav bar, not an input
+                            elif cy_ratio > 0.85:
+                                score -= 4    # Penalty: footer area
+                            # Prefer elements with reasonable height (not too thin like nav links)
+                            elem_h = h
+                            if 25 <= elem_h <= 80:
+                                score += 6
                         
                         if wants_button:
                             # Buttons: small to medium, roughly square-ish
                             if 0.5 <= ar <= 4:
                                 score += 10
+                            # Buttons can be anywhere, slight preference for center
+                            if abs(cx / img_w - 0.5) < 0.4:
+                                score += 3
                         
                         if score > best_shape_score:
                             best_shape_score = score
