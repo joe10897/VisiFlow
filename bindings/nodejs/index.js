@@ -56,6 +56,14 @@ class VisiPage {
         throw new Error(`[VisiFlow-JS] Could not visually locate element '${textOrLabel}' within ${timeoutMs}ms`);
     }
 
+    async visualPress(key, timeoutMs = 10000) {
+        const cleanKey = key.replace(/[{}]/g, "");
+        const titleKey = cleanKey.charAt(0).toUpperCase() + cleanKey.slice(1);
+        await this.page.keyboard.press(titleKey);
+        console.log(`[VisiFlow-JS] Visual Press keyboard key: ${titleKey}`);
+        return true;
+    }
+
     async visualFill(textOrLabel, value, timeoutMs = 10000) {
         const start = Date.now();
         while (Date.now() - start < timeoutMs) {

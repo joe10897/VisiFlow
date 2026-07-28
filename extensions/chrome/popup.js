@@ -128,16 +128,21 @@ function renderStepsList() {
     num.textContent = idx + 1;
     row.appendChild(num);
     
-    // ── Action Dropdown (Click or Fill) ────────────────────────
+    // ── Action Dropdown (Click, Fill or Key) ────────────────────
     const select = document.createElement("select");
     select.className = "step-select";
     select.innerHTML = `
       <option value="click" ${step.action === "click" ? "selected" : ""}>Click</option>
       <option value="fill" ${step.action === "fill" ? "selected" : ""}>Fill</option>
+      <option value="key" ${step.action === "key" ? "selected" : ""}>Key</option>
     `;
     select.addEventListener("change", (e) => {
       step.action = e.target.value;
       if (step.action === "fill" && !step.value) step.value = "text";
+      if (step.action === "key") {
+        step.target = "{enter}";
+        step.value = null;
+      }
       chrome.storage.local.set({ recordedSteps });
       renderStepsList();
       updateScriptOutput();
@@ -149,7 +154,7 @@ function renderStepsList() {
     targetInput.type = "text";
     targetInput.className = "step-input";
     targetInput.value = step.target || "";
-    targetInput.placeholder = "Visual target label";
+    targetInput.placeholder = step.action === "key" ? "Key e.g. {enter}" : "Visual target label";
     targetInput.addEventListener("input", (e) => {
       step.target = e.target.value;
       chrome.storage.local.set({ recordedSteps });
@@ -359,6 +364,8 @@ function updateScriptOutput() {
         codeLines.push(`    v.visual_click("${step.target}")`);
       } else if (step.action === "fill") {
         codeLines.push(`    v.visual_fill("${step.target}", "${step.value}")`);
+      } else if (step.action === "key") {
+        codeLines.push(`    v.visual_press("${step.target}")`);
       }
     });
   } else if (lang === "python_selenium") {
@@ -374,6 +381,8 @@ function updateScriptOutput() {
         codeLines.push(`v.visual_click("${step.target}")`);
       } else if (step.action === "fill") {
         codeLines.push(`v.visual_fill("${step.target}", "${step.value}")`);
+      } else if (step.action === "key") {
+        codeLines.push(`v.visual_press("${step.target}")`);
       }
     });
   } else if (lang === "js_playwright") {
@@ -391,6 +400,8 @@ function updateScriptOutput() {
         codeLines.push(`    await v.visualClick('${step.target}');`);
       } else if (step.action === "fill") {
         codeLines.push(`    await v.visualFill('${step.target}', '${step.value}');`);
+      } else if (step.action === "key") {
+        codeLines.push(`    await v.visualPress('${step.target}');`);
       }
     });
     codeLines.push("\n    await browser.close();");
@@ -456,51 +467,88 @@ runBtn.addEventListener("click", async () => {
 
   for (let i = 0; i < recordedSteps.length; i++) {
     const step = recordedSteps[i];
-    scriptBox.value += `\n// [Step ${i+1}/${recordedSteps.length}] Finding & executing target: "${step.target}"...`;
     
-    // 1. Capture screen and query local match API for coordinates of this text/label
-    const res = await new Promise(resolve => {
-      chrome.runtime.sendMessage({ action: "resolveTarget", query: step.target }, resolve);
-    });
-    
-    if (!res || !res.found) {
-      alert(`Playback failed at step ${i+1}: Could not visually find target "${step.target}" on page.`);
-      break;
-    }
-    
-    // 2. Dispatch simulated click or fill event to content.js
-    const dpr = window.devicePixelRatio || 1;
-    await new Promise(resolve => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (!tabs.length) {
-          resolve();
-          return;
-        }
-        
-        chrome.scripting.executeScript({
-          target: { tabId: tabs[0].id },
-          files: ["content.js"]
-        }, () => {
-          if (chrome.runtime.lastError) {
-            console.error("Playback injection failed:", chrome.runtime.lastError.message);
+    if (step.action === "key") {
+      scriptBox.value += `\n// [Step ${i+1}/${recordedSteps.length}] Sending keyboard key: "${step.target}"...`;
+      
+      await new Promise(resolve => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (!tabs.length) {
             resolve();
             return;
           }
-          chrome.tabs.sendMessage(tabs[0].id, {
-            action: "executePlayback",
-            type: step.action,
-            x: res.x / dpr,
-            y: res.y / dpr,
-            value: step.value
+          
+          chrome.scripting.executeScript({
+            target: { tabId: tabs[0].id },
+            files: ["content.js"]
           }, () => {
             if (chrome.runtime.lastError) {
-              console.warn("Playback sendMessage failed:", chrome.runtime.lastError.message);
+              console.error("Playback injection failed:", chrome.runtime.lastError.message);
+              resolve();
+              return;
             }
-            resolve();
+            chrome.tabs.sendMessage(tabs[0].id, {
+              action: "executePlayback",
+              type: "key",
+              x: 0,
+              y: 0,
+              value: step.target
+            }, () => {
+              if (chrome.runtime.lastError) {
+                console.warn("Playback sendMessage failed:", chrome.runtime.lastError.message);
+              }
+              resolve();
+            });
           });
         });
       });
-    });
+    } else {
+      scriptBox.value += `\n// [Step ${i+1}/${recordedSteps.length}] Finding & executing target: "${step.target}"...`;
+      
+      // 1. Capture screen and query local match API for coordinates of this text/label
+      const res = await new Promise(resolve => {
+        chrome.runtime.sendMessage({ action: "resolveTarget", query: step.target }, resolve);
+      });
+      
+      if (!res || !res.found) {
+        alert(`Playback failed at step ${i+1}: Could not visually find target "${step.target}" on page.`);
+        break;
+      }
+      
+      // 2. Dispatch simulated click or fill event to content.js
+      const dpr = window.devicePixelRatio || 1;
+      await new Promise(resolve => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (!tabs.length) {
+            resolve();
+            return;
+          }
+          
+          chrome.scripting.executeScript({
+            target: { tabId: tabs[0].id },
+            files: ["content.js"]
+          }, () => {
+            if (chrome.runtime.lastError) {
+              console.error("Playback injection failed:", chrome.runtime.lastError.message);
+              resolve();
+              return;
+            }
+            chrome.tabs.sendMessage(tabs[0].id, {
+              action: "executePlayback",
+              type: step.action,
+              x: res.x / dpr,
+              y: res.y / dpr,
+              value: step.value
+            }, () => {
+              if (chrome.runtime.lastError) {
+                console.warn("Playback sendMessage failed:", chrome.runtime.lastError.message);
+              }
+              resolve();
+            });
+          });
+        });
+      });
+    }
     
     // 3. Wait for layout changes, page load, or transitions before doing next step
     await new Promise(resolve => setTimeout(resolve, 1800));

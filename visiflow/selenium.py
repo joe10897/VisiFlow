@@ -127,6 +127,28 @@ class VisiSeleniumDriver:
         global_reporter.end_step(step_idx, success=False, score=0.0, healed=False, original_match=text_or_label, healed_match="")
         raise TimeoutError(f"Could not locate element with text/label '{text_or_label}' visually within {timeout_ms}ms")
 
+    def visual_press(self, key: str) -> bool:
+        """
+        Press a keyboard key on the active/focused element.
+        
+        :param key: The key name (e.g. "Enter", "{enter}", "Backspace")
+        """
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.common.action_chains import ActionChains
+        
+        clean_key = key.strip("{}").lower()
+        key_map = {
+            "enter": Keys.ENTER,
+            "backspace": Keys.BACKSPACE,
+            "tab": Keys.TAB,
+            "escape": Keys.ESCAPE,
+            "space": Keys.SPACE,
+        }
+        mapped_key = key_map.get(clean_key, clean_key)
+        ActionChains(self.driver).send_keys(mapped_key).perform()
+        logger.info(f"Successfully pressed keyboard key: {clean_key}")
+        return True
+
     def visual_fill(self, text_or_label: str, value: str, timeout_ms: int = 10000) -> bool:
         """
         Locate an input box visually, click it, clear it, and type the value.

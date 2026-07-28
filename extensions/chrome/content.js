@@ -55,6 +55,51 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ status: "success" });
   } else if (request.action === "executePlayback") {
     const { type, x, y, value } = request;
+    
+    if (type === "key") {
+      // Keyboard action: target is the active element (e.g. focused search input)
+      const target = document.activeElement || document.body;
+      const keyName = value || "Enter";
+      const cleanKey = keyName.replace(/[{}]/g, "");
+      const titleKey = cleanKey.charAt(0).toUpperCase() + cleanKey.slice(1); // e.g. "Enter"
+      
+      // Calculate viewport coordinate for active element to show visual indicator
+      const rect = target.getBoundingClientRect();
+      const scrollX = window.scrollX || window.pageXOffset;
+      const scrollY = window.scrollY || window.pageYOffset;
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      
+      // Play indicator & border glow
+      showPlaybackIndicator(cx + scrollX, cy + scrollY, "key");
+      showPlaybackBorderHighlight(target, "key");
+      
+      // Dispatch key events
+      setTimeout(() => {
+        target.dispatchEvent(new KeyboardEvent("keydown", { key: titleKey, code: titleKey, bubbles: true, cancelable: true }));
+        target.dispatchEvent(new KeyboardEvent("keypress", { key: titleKey, code: titleKey, bubbles: true, cancelable: true }));
+        
+        // Custom behavior for Enter to submit form if applicable
+        if (titleKey === "Enter") {
+          if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+            const form = target.form;
+            if (form) {
+              form.submit();
+            } else {
+              // Pressing enter on Google search input triggers a click on search button or submit action
+              // Fallback: send input event
+              target.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+          }
+        }
+        
+        target.dispatchEvent(new KeyboardEvent("keyup", { key: titleKey, code: titleKey, bubbles: true, cancelable: true }));
+      }, 200);
+      
+      sendResponse({ status: "success" });
+      return;
+    }
+
     const scrollX = window.scrollX || window.pageXOffset;
     const scrollY = window.scrollY || window.pageYOffset;
     
@@ -77,20 +122,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Play beautiful pulse circle animation at coordinate
     showPlaybackIndicator(absoluteX, absoluteY, type);
     
-    // Highlight the target element with a temporary glow
+    // Highlight the target element with a temporary border highlight glow
     if (target) {
-      const originalOutline = target.style.outline;
-      const originalTransition = target.style.transition;
-      target.style.transition = "outline 0.2s ease, box-shadow 0.2s ease";
-      target.style.outline = type === "click" ? "3px solid #f43f5e" : "3px solid #38bdf8";
-      target.style.boxShadow = type === "click" ? "0 0 10px rgba(244, 63, 94, 0.6)" : "0 0 10px rgba(56, 189, 248, 0.6)";
-      setTimeout(() => {
-        target.style.outline = originalOutline;
-        target.style.boxShadow = "";
-        setTimeout(() => {
-          target.style.transition = originalTransition;
-        }, 200);
-      }, 800);
+      showPlaybackBorderHighlight(target, type);
     }
 
     setTimeout(() => {
@@ -211,9 +245,11 @@ function clearOverlays() {
 }
 
 function showPlaybackIndicator(x, y, type) {
-  const color = type === "click" ? "#f43f5e" : "#38bdf8";
-  const colorAlpha = type === "click" ? "rgba(244, 63, 94, 0.4)" : "rgba(56, 189, 248, 0.4)";
-  const label = type === "click" ? "🖱 Click" : "⌨️ Fill";
+  const color = type === "click" ? "#f43f5e" : (type === "key" ? "#10b981" : "#38bdf8");
+  const colorAlpha = type === "click" ? "rgba(244, 63, 94, 0.4)" : (type === "key" ? "rgba(16, 185, 129, 0.4)" : "rgba(56, 189, 248, 0.4)");
+  let label = "🖱 Click";
+  if (type === "fill") label = "⌨️ Fill";
+  else if (type === "key") label = "⌨️ Key";
 
   // ── Outer ripple ring ──────────────────────────────────────
   const ring = document.createElement("div");
@@ -298,4 +334,45 @@ function showPlaybackIndicator(x, y, type) {
     }, 450);
   }, 700);
 }
+
+function showPlaybackBorderHighlight(target, type) {
+  if (!target) return;
+  const rect = target.getBoundingClientRect();
+  const scrollX = window.scrollX || window.pageXOffset;
+  const scrollY = window.scrollY || window.pageYOffset;
+  
+  const borderHighlight = document.createElement("div");
+  const color = type === "click" ? "#f43f5e" : (type === "key" ? "#10b981" : "#38bdf8");
+  
+  borderHighlight.style.cssText = `
+    position: absolute;
+    left: ${rect.left + scrollX}px;
+    top: ${rect.top + scrollY}px;
+    width: ${rect.width}px;
+    height: ${rect.height}px;
+    border: 3px solid ${color};
+    box-shadow: 0 0 20px ${color}, inset 0 0 10px ${color};
+    border-radius: 6px;
+    z-index: 2147483646;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(1.03);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  `;
+  document.body.appendChild(borderHighlight);
+  
+  // Trigger entry animation
+  requestAnimationFrame(() => {
+    borderHighlight.style.opacity = "1";
+    borderHighlight.style.transform = "scale(1)";
+  });
+  
+  // Fade out and remove
+  setTimeout(() => {
+    borderHighlight.style.opacity = "0";
+    borderHighlight.style.transform = "scale(0.97)";
+    setTimeout(() => borderHighlight.remove(), 250);
+  }, 900);
+}
+
 
