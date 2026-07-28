@@ -306,67 +306,73 @@ class VisiFlowDetector:
             is_class_query = any(pat in query_clean_lower for pat in ui_class_patterns)
             
             if is_class_query:
-                ui_elements = self.detect_elements(img_path)
-                
-                # Build a semantic query->label affinity map to pick the best match
-                # e.g. "search bar" or "search box" should prefer "input_field" over "ui_element"
-                query_to_label_hints = {
-                    "search": ["input_field", "input"],
-                    "bar": ["input_field", "input"],
-                    "box": ["input_field", "input"],
-                    "text": ["input_field", "input"],
-                    "form": ["input_field", "input"],
-                    "area": ["input_field", "textarea"],
-                    "button": ["button"],
-                    "link": ["a", "link"],
-                    "tab": ["tab"],
-                    "dropdown": ["select", "dropdown"],
-                    "toggle": ["checkbox", "toggle"],
-                    "checkbox": ["checkbox"],
-                    "radio": ["radio"],
-                }
-                
-                # Score each element by how well its label matches what we'd expect
-                best_label_match = None
-                best_label_score = -1
-                
-                for elem in ui_elements:
-                    elem_label = elem["label"].lower()
-                    score = 0
+                # Shape-based heuristic: find elements that match the expected visual shape of the query type.
+                # This handles the case where YOLO labels are numeric or generic ('ui_element'),
+                # so we cannot rely on label text matching at all.
+                img_raw = cv2.imread(img_path)
+                if img_raw is not None:
+                    img_h, img_w = img_raw.shape[:2]
+                    ui_elements = self.detect_elements(img_path)
                     
-                    # Direct match: query words appear in label
-                    for word in query_clean_lower.split("_"):
-                        if word in elem_label:
-                            score += 2
+                    # Determine the shape profile expected for this kind of query
+                    input_keywords  = {"search", "bar", "box", "input", "text", "form", "area", "field"}
+                    button_keywords = {"button", "btn", "submit", "ok", "cancel"}
                     
-                    # Hint-based match: query implies certain element types
-                    for hint_key, preferred_labels in query_to_label_hints.items():
-                        if hint_key in query_clean_lower:
-                            for pref in preferred_labels:
-                                if pref in elem_label:
-                                    score += 3  # High affinity bonus
+                    query_words = set(query_clean_lower.replace("_", " ").split())
+                    wants_input  = bool(query_words & input_keywords)
+                    wants_button = bool(query_words & button_keywords)
                     
-                    # General YOLO label contains query or vice versa
-                    if query_clean_lower in elem_label or elem_label in query_clean_lower:
-                        score += 1
+                    best_shape_match = None
+                    best_shape_score = -1
                     
-                    if score > best_label_score:
-                        best_label_score = score
-                        best_label_match = elem
-                
-                if best_label_match and best_label_score > 0:
-                    elem_box = best_label_match["box"]
-                    elem_center = ((elem_box[0] + elem_box[2]) // 2, (elem_box[1] + elem_box[3]) // 2)
-                    logger.info(f"Fell back to matching YOLO/OpenCV class label '{best_label_match['label']}' (score={best_label_score}) at {elem_box} for query '{query_text}'")
+                    for elem in ui_elements:
+                        box = elem["box"]
+                        w = box[2] - box[0]
+                        h = box[3] - box[1]
+                        if h == 0:
+                            continue
+                        ar = w / h  # Aspect ratio
+                        cx = (box[0] + box[2]) / 2
+                        cy = (box[1] + box[3]) / 2
+                        
+                        score = 0
+                        
+                        if wants_input:
+                            # Input fields: wide & horizontal (AR > 3), typically in middle third of page
+                            if ar >= 3:
+                                score += int(min(ar, 20))  # Wider = more likely to be an input bar
+                            if ar >= 5:
+                                score += 10  # Extra bonus for very wide elements
+                            # Centered horizontally (Google search bar is centred)
+                            center_dist = abs(cx / img_w - 0.5)
+                            if center_dist < 0.2:
+                                score += 8
+                            # Not too close to screen edges vertically
+                            if 0.1 < (cy / img_h) < 0.85:
+                                score += 5
+                        
+                        if wants_button:
+                            # Buttons: small to medium, roughly square-ish
+                            if 0.5 <= ar <= 4:
+                                score += 10
+                        
+                        if score > best_shape_score:
+                            best_shape_score = score
+                            best_shape_match = elem
                     
-                    self.last_match = {
-                        "found": True,
-                        "query": query_text,
-                        "score": 1.0,
-                        "matched_text": best_label_match["label"],
-                        "healed": True
-                    }
-                    return elem_center
+                    if best_shape_match and best_shape_score > 0:
+                        elem_box = best_shape_match["box"]
+                        elem_center = ((elem_box[0] + elem_box[2]) // 2, (elem_box[1] + elem_box[3]) // 2)
+                        logger.info(f"Shape-heuristic fallback: matched a '{('input' if wants_input else 'button')}-like' element at {elem_box} (score={best_shape_score}) for query '{query_text}'")
+                        
+                        self.last_match = {
+                            "found": True,
+                            "query": query_text,
+                            "score": 1.0,
+                            "matched_text": f"shape:{best_shape_match['label']}",
+                            "healed": True
+                        }
+                        return elem_center
             
             self.last_match = {
                 "found": False,
