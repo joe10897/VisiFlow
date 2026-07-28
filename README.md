@@ -195,13 +195,19 @@ VisiFlow's built-in Web Playground includes a **Script Recorder** that lets you 
 
 3. Toggle **"Enable Recording"** in the Script Recorder panel on the right sidebar.
 
-4. **Click on any detected element** (green OCR text boxes or blue UI element boxes) on the canvas:
+- **Click on any detected element** (green OCR text boxes or blue UI element boxes) on the canvas:
    - Clicking a **button/link** automatically generates a `visual_click()` call.
    - Clicking an **input field** prompts you for a text value and generates a `visual_fill()` call.
 
-5. Switch between **Python** and **JavaScript** output using the language dropdown.
+5. **Insert Keyboard Actions (New)**:
+   - Add special keyboard actions (like `{enter}`, `{tab}`, `{escape}`) from the recorder panel to send keystrokes directly into focused elements.
 
-6. Click **Copy** to copy the generated script to your clipboard, ready to paste into your test file!
+6. **▶️ Run Script Playback (New)**:
+   - When recording steps from a live analyzed URL, click the **"Run Script"** button to launch a local browser and watch VisiFlow replay your actions sequentially with real-time visual feedback!
+
+7. Switch between **Python** and **JavaScript** output using the language dropdown.
+
+8. Click **Copy** to copy the generated script to your clipboard, ready to paste into your test file!
 
 ---
 
@@ -231,8 +237,15 @@ VisiFlow comes with a **Chrome Extension** that allows you to record visual auto
 5. **Click on any bounding box** on the page to record an action:
    - Click a text block to record a `visual_click()` on that text.
    - Click an input box to prompt for a string and record a `visual_fill()` action.
-6. Select your output format (**Python + Playwright**, **Python + Selenium**, or **Node.js + Playwright**) from the dropdown.
-7. Click **"Copy"** to copy the complete generated script, or **"Clear"** to restart recording!
+6. **Manage recorded steps in the Steps Editor (New)**:
+   - Use the **▲ / ▼** buttons to reorder steps instantly.
+   - Use the **＋** button to insert a blank action step below.
+   - Change the action type to **`Key`** to simulate keyboard inputs (like `{enter}`, `{tab}`) for form submissions.
+   - Click **✕** to delete steps.
+7. **▶️ Run Script with Neon Border Highlights (New)**:
+   - Replay steps sequentially directly on your active browser tab. During replay, VisiFlow renders expanding **ripple indicators** and temporary **neon glow borders** around target elements, making test verification fully transparent.
+8. Select your output format (**Python + Playwright**, **Python + Selenium**, or **Node.js + Playwright**) from the dropdown.
+9. Click **"Copy"** to copy the complete generated script, or **"Clear"** to restart recording!
 
 ---
 
@@ -283,6 +296,7 @@ VisiFlow comes with a CLI tool:
 | :--- | :--- | :--- |
 | `VisiPlaywrightPage` | `visual_click(text, timeout_ms=10000)` | Click an element by its visible text label |
 | | `visual_fill(text, value, timeout_ms=10000)` | Fill an input field located by visible text |
+| | `visual_press(key)` | **(New)** Press a keyboard key (e.g. `"Enter"`, `"{enter}"`, `"Backspace"`) on the active element |
 | | `visual_wait_for(text, timeout_ms=10000)` | Wait for text to become visible |
 | | `visual_assert_visible(text, timeout_ms=10000)` | Assert text is visible on screen |
 | | `visual_assert_not_visible(text, timeout_ms=5000)` | Assert text is NOT visible on screen |
@@ -295,6 +309,7 @@ VisiFlow comes with a CLI tool:
 | :--- | :--- | :--- |
 | `VisiPage` | `visualClick(text, timeoutMs=10000)` | Click an element by visible text |
 | | `visualFill(text, value, timeoutMs=10000)` | Fill an input field by visible text |
+| | `visualPress(key)` | **(New)** Press a keyboard key (e.g. `"Enter"`, `"{enter}"`, `"Backspace"`) on the active element |
 | | `visualWaitFor(text, timeoutMs=10000)` | Wait for text to become visible |
 | | `visualAssertVisible(text, timeoutMs=10000)` | Assert text is visible |
 | | `visualAssertNotVisible(text, timeoutMs=5000)` | Assert text is NOT visible |
