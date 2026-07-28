@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "VisiFlow E2E Recorder",
+  "version": "0.3.0",
+  "description": "Visual-driven E2E test recorder for VisiFlow. Bypasses the DOM and records tests using local computer vision.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "128": "icon.png"
+  }
+}

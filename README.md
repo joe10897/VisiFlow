@@ -1,9 +1,9 @@
 # 👁️ VisiFlow
 
 [![PyPI version](https://img.shields.io/pypi/v/visiflow.svg)](https://pypi.org/project/visiflow/)
-[![PyPI Release](https://img.shields.io/badge/PyPI-v0.3.2-blue?logo=pypi&logoColor=white)](https://pypi.org/project/visiflow/)
+[![PyPI Release](https://img.shields.io/badge/PyPI-v0.4.0-blue?logo=pypi&logoColor=white)](https://pypi.org/project/visiflow/)
 [![npm version](https://img.shields.io/npm/v/visiflow-js.svg)](https://www.npmjs.com/package/visiflow-js)
-[![npm Release](https://img.shields.io/badge/npm-v0.3.2-red?logo=npm&logoColor=white)](https://www.npmjs.com/package/visiflow-js)
+[![npm Release](https://img.shields.io/badge/npm-v0.4.0-red?logo=npm&logoColor=white)](https://www.npmjs.com/package/visiflow-js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Supported Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-blue.svg)]()
 
@@ -29,12 +29,12 @@ It challenges traditional web automation by throwing away fragile HTML DOM selec
 
 ## 📦 Installation
 
-### Python Package ([PyPI v0.3.2](https://pypi.org/project/visiflow/))
+### Python Package ([PyPI v0.4.0](https://pypi.org/project/visiflow/))
 ```bash
 pip install "visiflow[playwright,selenium]"
 ```
 
-### Node.js Package ([npm v0.3.2](https://www.npmjs.com/package/visiflow-js))
+### Node.js Package ([npm v0.4.0](https://www.npmjs.com/package/visiflow-js))
 ```bash
 npm install visiflow-js
 ```
@@ -202,6 +202,37 @@ VisiFlow's built-in Web Playground includes a **Script Recorder** that lets you 
 5. Switch between **Python** and **JavaScript** output using the language dropdown.
 
 6. Click **Copy** to copy the generated script to your clipboard, ready to paste into your test file!
+
+---
+
+## 🧩 Chrome Extension Test Recorder
+
+VisiFlow comes with a **Chrome Extension** that allows you to record visual automation tests **directly on your live web application** without manual screenshotting.
+
+### How to Install
+
+1. Open Google Chrome and navigate to `chrome://extensions/`.
+2. Enable **"Developer mode"** toggled at the top-right corner of the page.
+3. Click the **"Load unpacked"** button at the top-left corner.
+4. Select the **`extensions/chrome`** directory from this repository.
+5. The VisiFlow E2E Recorder icon 👁️ will appear in your extensions list!
+
+### How to Use
+
+1. Ensure the local VisiFlow daemon is running in your terminal:
+   ```bash
+   visiflow server
+   ```
+2. Navigate to the web application you wish to test in Chrome.
+3. Click the VisiFlow extension icon in your toolbar. You should see a green **Connected** badge indicating it has linked to your local daemon server.
+4. Click the **"📸 Scan Web Elements"** button. The extension will automatically take a screenshot and overlay interactive bounding boxes directly on top of your live web page:
+   - **Green boxes** show recognized text (OCR).
+   - **Blue boxes** show detected UI elements (YOLO).
+5. **Click on any bounding box** on the page to record an action:
+   - Click a text block to record a `visual_click()` on that text.
+   - Click an input box to prompt for a string and record a `visual_fill()` action.
+6. Select your output format (**Python + Playwright**, **Python + Selenium**, or **Node.js + Playwright**) from the dropdown.
+7. Click **"Copy"** to copy the complete generated script, or **"Clear"** to restart recording!
 
 ---
 
