@@ -180,7 +180,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 hideOverlaysBtn.addEventListener("click", () => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs.length) {
-      chrome.tabs.sendMessage(tabs[0].id, { action: "clearOverlays" });
+      chrome.tabs.sendMessage(tabs[0].id, { action: "clearOverlays" }, () => {
+        if (chrome.runtime.lastError) {
+          console.log("No active overlays to hide (safe to ignore).");
+        }
+      });
     }
   });
 });
@@ -274,7 +278,11 @@ clearBtn.addEventListener("click", () => {
     // Clear active overlays if any
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs.length) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: "clearOverlays" });
+        chrome.tabs.sendMessage(tabs[0].id, { action: "clearOverlays" }, () => {
+          if (chrome.runtime.lastError) {
+            // Safe to ignore if content script is not loaded
+          }
+        });
       }
     });
   }
@@ -294,7 +302,11 @@ runBtn.addEventListener("click", async () => {
   // Hide active overlays first so they don't block element discovery or clicks
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs.length) {
-      chrome.tabs.sendMessage(tabs[0].id, { action: "clearOverlays" });
+      chrome.tabs.sendMessage(tabs[0].id, { action: "clearOverlays" }, () => {
+        if (chrome.runtime.lastError) {
+          // Safe to ignore if content script is not loaded
+        }
+      });
     }
   });
   
@@ -328,13 +340,23 @@ runBtn.addEventListener("click", async () => {
           target: { tabId: tabs[0].id },
           files: ["content.js"]
         }, () => {
+          if (chrome.runtime.lastError) {
+            console.error("Playback injection failed:", chrome.runtime.lastError.message);
+            resolve();
+            return;
+          }
           chrome.tabs.sendMessage(tabs[0].id, {
             action: "executePlayback",
             type: step.action,
             x: res.x / dpr,
             y: res.y / dpr,
             value: step.value
-          }, resolve);
+          }, () => {
+            if (chrome.runtime.lastError) {
+              console.warn("Playback sendMessage failed:", chrome.runtime.lastError.message);
+            }
+            resolve();
+          });
         });
       });
     });
