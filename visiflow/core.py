@@ -295,24 +295,29 @@ class VisiFlowDetector:
             logger.warning(f"No OCR text match found for query: '{query_text}'. Trying class label fallback...")
             
             # --- Fallback: Check if query matches any YOLO or OpenCV class label ---
+            # ONLY apply class label fallback if the query itself is a class description (e.g. "input_field", "button", "ui_element"), 
+            # to prevent a specific text query (like "Google 商店") from matching a general YOLO box.
+            ui_class_patterns = ["input", "field", "button", "ui_element", "element", "select", "checkbox"]
             query_clean_lower = query_clean.lower()
-            ui_elements = self.detect_elements(img_path)
-            for elem in ui_elements:
-                elem_label = elem["label"].lower()
-                # Match e.g. "input_field", "button", "ui_element"
-                if query_clean_lower in elem_label or elem_label in query_clean_lower:
-                    elem_box = elem["box"]
-                    elem_center = ((elem_box[0] + elem_box[2]) // 2, (elem_box[1] + elem_box[3]) // 2)
-                    logger.info(f"Fell back to matching YOLO/OpenCV class label '{elem['label']}' at {elem_box} for query '{query_text}'")
-                    
-                    self.last_match = {
-                        "found": True,
-                        "query": query_text,
-                        "score": 1.0,
-                        "matched_text": elem["label"],
-                        "healed": True
-                    }
-                    return elem_center
+            is_class_query = any(pat in query_clean_lower for pat in ui_class_patterns)
+            
+            if is_class_query:
+                ui_elements = self.detect_elements(img_path)
+                for elem in ui_elements:
+                    elem_label = elem["label"].lower()
+                    if query_clean_lower in elem_label or elem_label in query_clean_lower:
+                        elem_box = elem["box"]
+                        elem_center = ((elem_box[0] + elem_box[2]) // 2, (elem_box[1] + elem_box[3]) // 2)
+                        logger.info(f"Fell back to matching YOLO/OpenCV class label '{elem['label']}' at {elem_box} for query '{query_text}'")
+                        
+                        self.last_match = {
+                            "found": True,
+                            "query": query_text,
+                            "score": 1.0,
+                            "matched_text": elem["label"],
+                            "healed": True
+                        }
+                        return elem_center
             
             self.last_match = {
                 "found": False,
