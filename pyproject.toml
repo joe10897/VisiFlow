@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "visiflow"
-version = "0.8.0"
+version = "0.8.1"
 description = "A fast, local, visual-driven E2E automation testing plugin for Playwright and Selenium powered by YOLO and OCR."
 readme = "README.md"
 requires-python = ">=3.8"
