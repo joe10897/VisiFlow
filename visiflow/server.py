@@ -134,7 +134,7 @@ async def detect_url(
     os.close(fd)
     
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.async_api import async_playwright
     except ImportError:
         raise HTTPException(
             status_code=400, 
@@ -143,17 +143,17 @@ async def detect_url(
         
     try:
         logger.info(f"Navigating to URL to capture screenshot: {url}")
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.set_viewport_size({"width": 1280, "height": 800})
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.set_viewport_size({"width": 1280, "height": 800})
             
             # Navigate to URL
-            page.goto(url, wait_until="load", timeout=30000)
+            await page.goto(url, wait_until="load", timeout=30000)
             
             # Take normal viewport screenshot
-            page.screenshot(path=temp_path)
-            browser.close()
+            await page.screenshot(path=temp_path)
+            await browser.close()
             
         elements = detector.detect_elements(temp_path)
         ocr_items = detector.run_ocr(temp_path)
