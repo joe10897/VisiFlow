@@ -148,8 +148,11 @@ async def detect_url(
             page = await browser.new_page()
             await page.set_viewport_size({"width": 1280, "height": 800})
             
-            # Navigate to URL
-            await page.goto(url, wait_until="load", timeout=30000)
+            # Navigate to URL and wait for network to settle (essential for SPAs / dynamic APIs)
+            await page.goto(url, wait_until="networkidle", timeout=30000)
+            
+            # Wait an additional 2 seconds to allow animations/JS rendering to settle
+            await page.wait_for_timeout(2000)
             
             # Take normal viewport screenshot
             await page.screenshot(path=temp_path)
