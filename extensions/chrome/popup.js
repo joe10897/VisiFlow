@@ -12,6 +12,7 @@ const scriptBox = document.getElementById("script-box");
 const langSelect = document.getElementById("lang-select");
 const copyBtn = document.getElementById("copy-btn");
 const clearBtn = document.getElementById("clear-btn");
+const hideOverlaysBtn = document.getElementById("hide-overlays-btn");
 
 let activeTabUrl = "https://example.com";
 
@@ -170,15 +171,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Update code textarea
     updateScriptOutput();
 
-    // Clear overlays after action to allow scrolling/normal page interaction
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: "clearOverlays" });
-      }
-    });
-
     sendResponse({ status: "success" });
   }
+});
+
+// Hide overlays manually on page
+hideOverlaysBtn.addEventListener("click", () => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs.length) {
+      chrome.tabs.sendMessage(tabs[0].id, { action: "clearOverlays" });
+    }
+  });
 });
 
 langSelect.addEventListener("change", () => {

@@ -184,10 +184,13 @@
         </div>
     </div>
 
-    <button id="scan-btn" class="btn btn-scan">
-        <span class="loader" id="scan-loader"></span>
-        <span>📸 Scan Web Elements</span>
-    </button>
+    <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+        <button id="scan-btn" class="btn btn-scan" style="flex: 2; margin-bottom: 0;">
+            <span class="loader" id="scan-loader"></span>
+            <span>📸 Scan Elements</span>
+        </button>
+        <button id="hide-overlays-btn" class="btn btn-secondary" style="flex: 1; margin-bottom: 0; padding: 10px 14px; font-size: 0.82rem; white-space: nowrap;">👁️ Hide Boxes</button>
+    </div>
 
     <div class="config-row">
         <label>Language:</label>
