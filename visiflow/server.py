@@ -9,9 +9,15 @@ from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
+from fastapi.staticfiles import StaticFiles
 from .core import VisiFlowDetector, logger
 
 app = FastAPI(title="VisiFlow Vision Daemon", version="0.1.0")
+
+# Mount static files directory
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/ui/static", StaticFiles(directory=static_dir), name="ui-static")
 
 # Enable CORS for local cross-origin queries (e.g. from browser playground)
 app.add_middleware(

@@ -1,4 +1,4 @@
-# 👁️ VisiFlow
+# <img src="assets/visiflow_logo.png" width="38" align="center" alt="Vf Logo"> VisiFlow
 
 [![PyPI version](https://img.shields.io/pypi/v/visiflow.svg)](https://pypi.org/project/visiflow/)
 [![PyPI Release](https://img.shields.io/badge/PyPI-v0.8.1-blue?logo=pypi&logoColor=white)](https://pypi.org/project/visiflow/)
