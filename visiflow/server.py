@@ -177,6 +177,93 @@ async def detect_url(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+class StepModel(BaseModel):
+    action: str
+    target: str
+    value: Optional[str] = None
+
+class RunScriptRequest(BaseModel):
+    url: str
+    steps: List[StepModel]
+
+@app.post("/run_script")
+async def run_script(req: RunScriptRequest):
+    """
+    Launch a local browser (headless=False) to run/replay the recorded steps.
+    """
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        raise HTTPException(
+            status_code=400, 
+            detail="Playwright is required to run scripts. Run 'pip install playwright && playwright install' first."
+        )
+    
+    logger.info(f"Replaying {len(req.steps)} steps on: {req.url}")
+    try:
+        async with async_playwright() as p:
+            # Open visible browser so the user can see the playback magic!
+            browser = await p.chromium.launch(headless=False)
+            page = await browser.new_page()
+            await page.set_viewport_size({"width": 1280, "height": 800})
+            
+            # Navigate to URL
+            await page.goto(req.url, wait_until="networkidle", timeout=30000)
+            
+            detector = get_detector()
+            
+            for idx, step in enumerate(req.steps):
+                logger.info(f"Executing step {idx+1}/{len(req.steps)}: {step.action} on '{step.target}'")
+                
+                if step.action == "key":
+                    clean_key = step.target.strip("{}")
+                    title_key = clean_key.capitalize() if clean_key.lower() in ["enter", "tab", "escape", "backspace"] else clean_key
+                    await page.keyboard.press(title_key)
+                    await page.wait_for_timeout(1200)
+                    continue
+                
+                # Click/Fill coordinate resolution
+                fd, temp_path = tempfile.mkstemp(suffix=".png")
+                os.close(fd)
+                try:
+                    await page.screenshot(path=temp_path)
+                    img = cv2.imread(temp_path)
+                    if img is None:
+                        raise Exception("Failed to read browser screenshot")
+                    sh, sw = img.shape[:2]
+                    
+                    viewport = page.viewport_size
+                    scale_x = viewport["width"] / sw
+                    scale_y = viewport["height"] / sh
+                    
+                    coords = detector.find_element_by_text(temp_path, step.target)
+                    if not coords:
+                        raise Exception(f"Could not visually find target '{step.target}' on page.")
+                    
+                    px = int(coords[0] * scale_x)
+                    py = int(coords[1] * scale_y)
+                    
+                    if step.action == "click":
+                        await page.mouse.click(px, py)
+                    elif step.action == "fill":
+                        await page.mouse.click(px, py, click_count=3)
+                        await page.keyboard.press("Backspace")
+                        await page.keyboard.type(step.value or "")
+                        
+                    await page.wait_for_timeout(1500)
+                finally:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+            
+            # Settle wait before close
+            await page.wait_for_timeout(2500)
+            await browser.close()
+            
+        return {"status": "success", "message": "Replay finished successfully"}
+    except Exception as e:
+        logger.error(f"Error during script replay: {e}")
+        return {"status": "error", "message": str(e)}
+
 @app.get("/ui", response_class=HTMLResponse)
 def get_web_ui():
     """
