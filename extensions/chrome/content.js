@@ -175,31 +175,91 @@ function clearOverlays() {
 }
 
 function showPlaybackIndicator(x, y, type) {
-  const pulse = document.createElement("div");
-  pulse.style.cssText = `
-    position: absolute;
-    left: ${x - 20}px;
-    top: ${y - 20}px;
-    width: 40px;
-    height: 40px;
+  const color = type === "click" ? "#f43f5e" : "#38bdf8";
+  const colorAlpha = type === "click" ? "rgba(244, 63, 94, 0.4)" : "rgba(56, 189, 248, 0.4)";
+  const label = type === "click" ? "🖱 Click" : "⌨️ Fill";
+
+  // ── Outer ripple ring ──────────────────────────────────────
+  const ring = document.createElement("div");
+  ring.style.cssText = `
+    position: fixed;
+    left: ${x - 28}px;
+    top: ${y - 28}px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
-    border: 3px solid ${type === "click" ? "#f43f5e" : "#38bdf8"};
-    background-color: ${type === "click" ? "rgba(244, 63, 94, 0.35)" : "rgba(56, 189, 248, 0.35)"};
+    border: 2px solid ${color};
+    background: transparent;
     z-index: 2147483647;
     pointer-events: none;
-    transition: transform 0.4s cubic-bezier(0.1, 0.8, 0.3, 1), opacity 0.4s ease-out;
-    transform: scale(0.4);
     opacity: 1;
+    transform: scale(0.3);
+    transition: transform 0.55s cubic-bezier(0.1, 0.8, 0.3, 1), opacity 0.55s ease-out;
   `;
-  document.body.appendChild(pulse);
-  
-  // Trigger expanding ripple pulse animation
+  document.body.appendChild(ring);
+
+  // ── Inner filled pulse dot ─────────────────────────────────
+  const dot = document.createElement("div");
+  dot.style.cssText = `
+    position: fixed;
+    left: ${x - 16}px;
+    top: ${y - 16}px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: ${colorAlpha};
+    border: 2.5px solid ${color};
+    z-index: 2147483647;
+    pointer-events: none;
+    opacity: 1;
+    transform: scale(0.4);
+    transition: transform 0.4s cubic-bezier(0.1, 0.8, 0.3, 1), opacity 0.4s ease-out;
+    box-shadow: 0 0 16px ${color};
+  `;
+  document.body.appendChild(dot);
+
+  // ── Action label badge ─────────────────────────────────────
+  const badge = document.createElement("div");
+  badge.style.cssText = `
+    position: fixed;
+    left: ${x + 20}px;
+    top: ${y - 14}px;
+    background: ${color};
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: 3px 8px;
+    border-radius: 6px;
+    z-index: 2147483647;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  `;
+  badge.textContent = label;
+  document.body.appendChild(badge);
+
+  // Animate in on next frame
   requestAnimationFrame(() => {
-    pulse.style.transform = "scale(1.3)";
+    ring.style.transform = "scale(1.6)";
+    ring.style.opacity = "0";
+    dot.style.transform = "scale(1)";
+    badge.style.opacity = "1";
+    badge.style.transform = "translateX(0)";
   });
-  
+
+  // Fade out and remove
   setTimeout(() => {
-    pulse.style.opacity = "0";
-    setTimeout(() => pulse.remove(), 400);
-  }, 500);
+    dot.style.opacity = "0";
+    badge.style.opacity = "0";
+    setTimeout(() => {
+      ring.remove();
+      dot.remove();
+      badge.remove();
+    }, 450);
+  }, 700);
 }
+

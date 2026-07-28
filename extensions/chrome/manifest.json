@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VisiFlow E2E Recorder",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "Visual-driven E2E test recorder for VisiFlow. Bypasses the DOM and records tests using local computer vision.",
   "permissions": [
     "activeTab",
