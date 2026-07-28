@@ -68,7 +68,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Resolve clickable/focusable target element hierarchy
     let target = element;
     if (target) {
-      const closestInteractive = target.closest("a, button, input, textarea, [role='button']");
+      const closestInteractive = target.closest("a, button, input, textarea, [role='button'], [role='combobox'], [role='searchbox']");
       if (closestInteractive) {
         target = closestInteractive;
       }
@@ -96,34 +96,70 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     setTimeout(() => {
       if (type === "click") {
         if (target) {
-          // Focus element first
-          if (typeof target.focus === "function") {
-            target.focus();
-          }
+          if (typeof target.focus === "function") target.focus();
           target.click();
           target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
         }
       } else if (type === "fill") {
-        if (target) {
-          let inputEl = target;
-          if (inputEl.tagName !== "INPUT" && inputEl.tagName !== "TEXTAREA") {
-            inputEl = target.querySelector("input, textarea") || target.closest("input, textarea");
-            if (!inputEl) {
-              const parent = target.parentElement;
-              if (parent) {
-                inputEl = parent.querySelector("input, textarea");
-              }
-            }
+        // Walk DOM to find the real input element (handles wrapper divs, React, etc.)
+        function findInputEl(el) {
+          if (!el) return null;
+          // Direct input/textarea
+          if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") return el;
+          // ARIA searchbox / combobox (Google search bar)
+          if (el.getAttribute("role") === "combobox" || el.getAttribute("role") === "searchbox") return el;
+          // Search within children
+          const inner = el.querySelector("input, textarea, [role='combobox'], [role='searchbox']");
+          if (inner) return inner;
+          // Walk up the DOM tree up to 5 levels
+          let parent = el.parentElement;
+          for (let i = 0; i < 5 && parent; i++, parent = parent.parentElement) {
+            const found = parent.querySelector("input, textarea, [role='combobox'], [role='searchbox']");
+            if (found) return found;
           }
-          if (inputEl) {
-            inputEl.focus();
-            inputEl.value = value;
-            inputEl.dispatchEvent(new Event("input", { bubbles: true }));
-            inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+          return null;
+        }
+        
+        const inputEl = findInputEl(target);
+        
+        if (inputEl) {
+          inputEl.focus();
+          inputEl.click();
+          
+          // --- React-compatible value setter ---
+          // React overrides the native .value setter with a custom one.
+          // To bypass it, we call the ORIGINAL native setter via Object.getOwnPropertyDescriptor.
+          const nativeInputProto = Object.getPrototypeOf(inputEl);
+          const descriptor = Object.getOwnPropertyDescriptor(nativeInputProto, "value");
+          if (descriptor && descriptor.set) {
+            descriptor.set.call(inputEl, value);
           } else {
+            inputEl.value = value;
+          }
+          
+          // Fire all the events React/Vue/Angular expect for a controlled input
+          const events = [
+            new Event("input", { bubbles: true }),
+            new Event("change", { bubbles: true }),
+            new KeyboardEvent("keydown", { bubbles: true, key: "a" }),
+            new KeyboardEvent("keypress", { bubbles: true, key: "a" }),
+            new KeyboardEvent("keyup", { bubbles: true, key: "a" }),
+          ];
+          events.forEach(e => inputEl.dispatchEvent(e));
+          
+          // Simulate typing each character for frameworks that listen to keyboard events
+          setTimeout(() => {
+            for (const char of value) {
+              inputEl.dispatchEvent(new KeyboardEvent("keydown",  { key: char, bubbles: true }));
+              inputEl.dispatchEvent(new KeyboardEvent("keypress", { key: char, bubbles: true }));
+              inputEl.dispatchEvent(new KeyboardEvent("keyup",    { key: char, bubbles: true }));
+            }
+          }, 50);
+        } else {
+          // Last resort: click and use execCommand to insert text
+          if (target) {
             target.focus();
-            target.innerText = value;
-            target.dispatchEvent(new Event("input", { bubbles: true }));
+            document.execCommand("insertText", false, value);
           }
         }
       }
