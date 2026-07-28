@@ -297,27 +297,76 @@ class VisiFlowDetector:
             # --- Fallback: Check if query matches any YOLO or OpenCV class label ---
             # ONLY apply class label fallback if the query itself is a class description (e.g. "input_field", "button", "ui_element"), 
             # to prevent a specific text query (like "Google 商店") from matching a general YOLO box.
-            ui_class_patterns = ["input", "field", "button", "ui_element", "element", "select", "checkbox"]
+            ui_class_patterns = [
+                "input", "field", "button", "ui_element", "element", "select", "checkbox",
+                "bar", "search", "box", "area", "form", "text", "label", "link", "tab",
+                "dropdown", "toggle", "radio", "slider", "icon", "container", "panel"
+            ]
             query_clean_lower = query_clean.lower()
             is_class_query = any(pat in query_clean_lower for pat in ui_class_patterns)
             
             if is_class_query:
                 ui_elements = self.detect_elements(img_path)
+                
+                # Build a semantic query->label affinity map to pick the best match
+                # e.g. "search bar" or "search box" should prefer "input_field" over "ui_element"
+                query_to_label_hints = {
+                    "search": ["input_field", "input"],
+                    "bar": ["input_field", "input"],
+                    "box": ["input_field", "input"],
+                    "text": ["input_field", "input"],
+                    "form": ["input_field", "input"],
+                    "area": ["input_field", "textarea"],
+                    "button": ["button"],
+                    "link": ["a", "link"],
+                    "tab": ["tab"],
+                    "dropdown": ["select", "dropdown"],
+                    "toggle": ["checkbox", "toggle"],
+                    "checkbox": ["checkbox"],
+                    "radio": ["radio"],
+                }
+                
+                # Score each element by how well its label matches what we'd expect
+                best_label_match = None
+                best_label_score = -1
+                
                 for elem in ui_elements:
                     elem_label = elem["label"].lower()
+                    score = 0
+                    
+                    # Direct match: query words appear in label
+                    for word in query_clean_lower.split("_"):
+                        if word in elem_label:
+                            score += 2
+                    
+                    # Hint-based match: query implies certain element types
+                    for hint_key, preferred_labels in query_to_label_hints.items():
+                        if hint_key in query_clean_lower:
+                            for pref in preferred_labels:
+                                if pref in elem_label:
+                                    score += 3  # High affinity bonus
+                    
+                    # General YOLO label contains query or vice versa
                     if query_clean_lower in elem_label or elem_label in query_clean_lower:
-                        elem_box = elem["box"]
-                        elem_center = ((elem_box[0] + elem_box[2]) // 2, (elem_box[1] + elem_box[3]) // 2)
-                        logger.info(f"Fell back to matching YOLO/OpenCV class label '{elem['label']}' at {elem_box} for query '{query_text}'")
-                        
-                        self.last_match = {
-                            "found": True,
-                            "query": query_text,
-                            "score": 1.0,
-                            "matched_text": elem["label"],
-                            "healed": True
-                        }
-                        return elem_center
+                        score += 1
+                    
+                    if score > best_label_score:
+                        best_label_score = score
+                        best_label_match = elem
+                
+                if best_label_match and best_label_score > 0:
+                    elem_box = best_label_match["box"]
+                    elem_center = ((elem_box[0] + elem_box[2]) // 2, (elem_box[1] + elem_box[3]) // 2)
+                    logger.info(f"Fell back to matching YOLO/OpenCV class label '{best_label_match['label']}' (score={best_label_score}) at {elem_box} for query '{query_text}'")
+                    
+                    self.last_match = {
+                        "found": True,
+                        "query": query_text,
+                        "score": 1.0,
+                        "matched_text": best_label_match["label"],
+                        "healed": True
+                    }
+                    return elem_center
             
             self.last_match = {
                 "found": False,
