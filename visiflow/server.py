@@ -120,6 +120,60 @@ async def detect_all(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+@app.post("/detect_url")
+async def detect_url(
+    url: str = Form(...)
+):
+    """
+    Launch Playwright, navigate to the URL, capture screenshot,
+    and run detection/OCR on it.
+    """
+    detector = get_detector()
+    
+    fd, temp_path = tempfile.mkstemp(suffix=".png")
+    os.close(fd)
+    
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        raise HTTPException(
+            status_code=400, 
+            detail="Playwright is required to use URL visualization. Run 'pip install playwright && playwright install' first."
+        )
+        
+    try:
+        logger.info(f"Navigating to URL to capture screenshot: {url}")
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.set_viewport_size({"width": 1280, "height": 800})
+            
+            # Navigate to URL
+            page.goto(url, wait_until="load", timeout=30000)
+            
+            # Take normal viewport screenshot
+            page.screenshot(path=temp_path)
+            browser.close()
+            
+        elements = detector.detect_elements(temp_path)
+        ocr_items = detector.run_ocr(temp_path)
+        
+        with open(temp_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
+            
+        return {
+            "status": "success",
+            "image_base64": f"data:image/png;base64,{encoded_string}",
+            "elements": elements,
+            "ocr": ocr_items
+        }
+    except Exception as e:
+        logger.error(f"Error rendering URL: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load URL: {str(e)}")
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
 @app.get("/ui", response_class=HTMLResponse)
 def get_web_ui():
     """

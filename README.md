@@ -1,9 +1,9 @@
 # 👁️ VisiFlow
 
 [![PyPI version](https://img.shields.io/pypi/v/visiflow.svg)](https://pypi.org/project/visiflow/)
-[![PyPI Release](https://img.shields.io/badge/PyPI-v0.2.1-blue?logo=pypi&logoColor=white)](https://pypi.org/project/visiflow/)
+[![PyPI Release](https://img.shields.io/badge/PyPI-v0.3.0-blue?logo=pypi&logoColor=white)](https://pypi.org/project/visiflow/)
 [![npm version](https://img.shields.io/npm/v/visiflow-js.svg)](https://www.npmjs.com/package/visiflow-js)
-[![npm Release](https://img.shields.io/badge/npm-v0.2.1-red?logo=npm&logoColor=white)](https://www.npmjs.com/package/visiflow-js)
+[![npm Release](https://img.shields.io/badge/npm-v0.3.0-red?logo=npm&logoColor=white)](https://www.npmjs.com/package/visiflow-js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Supported Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-blue.svg)]()
 
@@ -29,12 +29,12 @@ It challenges traditional web automation by throwing away fragile HTML DOM selec
 
 ## 📦 Installation
 
-### Python Package ([PyPI v0.2.1](https://pypi.org/project/visiflow/))
+### Python Package ([PyPI v0.3.0](https://pypi.org/project/visiflow/))
 ```bash
 pip install "visiflow[playwright,selenium]"
 ```
 
-### Node.js Package ([npm v0.2.1](https://www.npmjs.com/package/visiflow-js))
+### Node.js Package ([npm v0.3.0](https://www.npmjs.com/package/visiflow-js))
 ```bash
 npm install visiflow-js
 ```
@@ -226,9 +226,11 @@ visiflow ui
 ```
 
 This opens `http://localhost:8000/ui` in your browser, where you can:
-- **Drag & drop** any screenshot image to inspect bounding boxes and test queries live in real-time.
+- **Analyze Live URLs**: Paste any website URL (e.g. `https://github.com`) to spin up a headless Playwright browser, capture a screenshot, and detect elements in real-time.
+- **Drag & drop** any local screenshot image to inspect bounding boxes and test queries live.
 - **Search by text** using natural language (e.g., "Submit", "登入") to find and highlight target elements.
 - **Record scripts** using the built-in Script Recorder to generate Python or JS automation code by clicking on detected elements.
+- **Pre-trained YOLOv26n model**: Ships with an out-of-the-box `yolo26n.onnx` model custom-trained on thousands of web interfaces to locate buttons and input fields with maximum accuracy.
 
 ---
 

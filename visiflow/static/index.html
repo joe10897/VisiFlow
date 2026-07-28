@@ -292,11 +292,21 @@
 
     <main>
         <div class="stage-card" id="stage">
+            <button id="btn-reset" class="btn-primary" style="display: none; position: absolute; top: 16px; right: 16px; padding: 8px 16px; font-size: 0.85rem; border-radius: 8px; z-index: 5; background: rgba(244, 63, 94, 0.8); border: 1px solid rgba(255,255,255,0.2);" onclick="resetPlayground()">🔄 Reset / Upload New</button>
+
             <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click();">
                 <div class="drop-icon">📸</div>
                 <h3>Drop Screenshot Here</h3>
                 <p style="color: var(--text-muted); margin-top: 8px; font-size: 0.9rem;">or click to upload a webpage image</p>
                 <input type="file" id="file-input" accept="image/*" style="display: none;">
+            </div>
+
+            <div class="url-input-container" id="url-input-container" style="margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 500px; z-index: 2;">
+                <div style="color: var(--text-muted); font-size: 0.85rem; letter-spacing: 1px;">— OR PASTE LIVE WEB URL —</div>
+                <div style="display: flex; width: 100%; gap: 10px;">
+                    <input type="text" id="web-url-input" placeholder="e.g. https://github.com" style="flex: 1; padding: 12px 16px; border-radius: 8px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); color: white; font-size: 0.9rem;">
+                    <button class="btn-primary" onclick="analyzeUrl()" style="padding: 12px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">Analyze URL</button>
+                </div>
             </div>
 
             <div class="canvas-wrapper" id="canvas-wrapper">
@@ -305,7 +315,7 @@
 
             <div class="loading-overlay" id="loading">
                 <div class="spinner"></div>
-                <p style="margin-top: 16px; font-weight: 600; color: var(--accent-blue);">Running YOLO & OCR Detection...</p>
+                <p id="loading-text" style="margin-top: 16px; font-weight: 600; color: var(--accent-blue);">Running YOLO & OCR Detection...</p>
             </div>
         </div>
 
@@ -399,6 +409,7 @@
         }
 
         async function runDetection(base64Data) {
+            document.getElementById('loading-text').textContent = 'Running YOLO & OCR Detection...';
             loading.style.display = 'flex';
             matchedCoords = null;
             
@@ -412,12 +423,68 @@
                 jsonOutput.textContent = JSON.stringify(detectionData, null, 2);
                 render();
                 dropZone.style.display = 'none';
+                document.getElementById('url-input-container').style.display = 'none';
                 canvasWrapper.style.display = 'block';
+                document.getElementById('btn-reset').style.display = 'block';
             } catch (err) {
                 alert('Detection failed: ' + err.message);
             } finally {
                 loading.style.display = 'none';
             }
+        }
+
+        async function analyzeUrl() {
+            const url = document.getElementById('web-url-input').value.trim();
+            if (!url) {
+                alert('Please enter a website URL');
+                return;
+            }
+
+            document.getElementById('loading-text').textContent = 'Launching Playwright & Capturing Screenshot (may take ~5-10s)...';
+            loading.style.display = 'flex';
+            matchedCoords = null;
+            
+            try {
+                const formData = new FormData();
+                formData.append('url', url);
+
+                const resp = await fetch('/detect_url', { method: 'POST', body: formData });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    throw new Error(err.detail || 'Failed to render live URL');
+                }
+                const data = await resp.json();
+                
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    detectionData = data;
+                    jsonOutput.textContent = JSON.stringify(data, null, 2);
+                    render();
+                    dropZone.style.display = 'none';
+                    document.getElementById('url-input-container').style.display = 'none';
+                    canvasWrapper.style.display = 'block';
+                    document.getElementById('btn-reset').style.display = 'block';
+                    loading.style.display = 'none';
+                };
+                img.src = data.image_base64;
+            } catch (err) {
+                alert('URL Analysis failed: ' + err.message);
+                loading.style.display = 'none';
+            }
+        }
+
+        function resetPlayground() {
+            currentImage = null;
+            detectionData = null;
+            matchedCoords = null;
+            dropZone.style.display = 'block';
+            document.getElementById('url-input-container').style.display = 'flex';
+            canvasWrapper.style.display = 'none';
+            document.getElementById('btn-reset').style.display = 'none';
+            jsonOutput.textContent = '// Upload a screenshot to see bounding box coordinates';
+            document.getElementById('query-input').value = '';
+            document.getElementById('web-url-input').value = '';
         }
 
         async function findTarget() {
