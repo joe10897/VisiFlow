@@ -82,11 +82,20 @@ scanBtn.addEventListener("click", () => {
         target: { tabId: activeTabId },
         files: ["content.js"]
       }, () => {
+        if (chrome.runtime.lastError) {
+          alert("Injection failed: " + chrome.runtime.lastError.message + "\n\nNote: You cannot inject overlay scripts on chrome:// pages, extensions pages, or blank new tabs due to Chrome security policy.");
+          return;
+        }
+        
         // Send detection results to content.js to render overlays on page
         chrome.tabs.sendMessage(activeTabId, {
           action: "drawOverlays",
           elements: elements,
           ocr: ocr
+        }, (res) => {
+          if (chrome.runtime.lastError) {
+            console.warn("Message sending failed:", chrome.runtime.lastError.message);
+          }
         });
       });
     });
