@@ -1,6 +1,6 @@
 {
   "name": "visiflow-js",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Node.js & Playwright bindings for VisiFlow: Fast local visual E2E automation testing.",
   "main": "index.js",
   "scripts": {

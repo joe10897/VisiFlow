@@ -63,30 +63,67 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const absoluteY = y + scrollY;
     
     // Retrieve DOM element at targeted client coordinate
-    const element = document.elementFromPoint(x, y);
+    let element = document.elementFromPoint(x, y);
     
+    // Resolve clickable/focusable target element hierarchy
+    let target = element;
+    if (target) {
+      const closestInteractive = target.closest("a, button, input, textarea, [role='button']");
+      if (closestInteractive) {
+        target = closestInteractive;
+      }
+    }
+
     // Play beautiful pulse circle animation at coordinate
     showPlaybackIndicator(absoluteX, absoluteY, type);
     
+    // Highlight the target element with a temporary glow
+    if (target) {
+      const originalOutline = target.style.outline;
+      const originalTransition = target.style.transition;
+      target.style.transition = "outline 0.2s ease, box-shadow 0.2s ease";
+      target.style.outline = type === "click" ? "3px solid #f43f5e" : "3px solid #38bdf8";
+      target.style.boxShadow = type === "click" ? "0 0 10px rgba(244, 63, 94, 0.6)" : "0 0 10px rgba(56, 189, 248, 0.6)";
+      setTimeout(() => {
+        target.style.outline = originalOutline;
+        target.style.boxShadow = "";
+        setTimeout(() => {
+          target.style.transition = originalTransition;
+        }, 200);
+      }, 800);
+    }
+
     setTimeout(() => {
       if (type === "click") {
-        if (element) {
-          element.click();
-          element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        if (target) {
+          // Focus element first
+          if (typeof target.focus === "function") {
+            target.focus();
+          }
+          target.click();
+          target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
         }
       } else if (type === "fill") {
-        if (element) {
-          let inputEl = element;
+        if (target) {
+          let inputEl = target;
           if (inputEl.tagName !== "INPUT" && inputEl.tagName !== "TEXTAREA") {
-            inputEl = element.querySelector("input, textarea") || element.closest("input, textarea");
+            inputEl = target.querySelector("input, textarea") || target.closest("input, textarea");
+            if (!inputEl) {
+              const parent = target.parentElement;
+              if (parent) {
+                inputEl = parent.querySelector("input, textarea");
+              }
+            }
           }
           if (inputEl) {
+            inputEl.focus();
             inputEl.value = value;
             inputEl.dispatchEvent(new Event("input", { bubbles: true }));
             inputEl.dispatchEvent(new Event("change", { bubbles: true }));
           } else {
-            element.innerText = value;
-            element.dispatchEvent(new Event("input", { bubbles: true }));
+            target.focus();
+            target.innerText = value;
+            target.dispatchEvent(new Event("input", { bubbles: true }));
           }
         }
       }
