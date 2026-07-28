@@ -1,6 +1,7 @@
 // Content script to draw interactive VisiFlow overlays on top of the live web page
 
 let activeOverlays = [];
+let scrollListener = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "drawOverlays") {
@@ -9,17 +10,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const elements = request.elements || [];
     const ocr = request.ocr || [];
     
-    // Create an overlay layer container appended to document body
+    // Set container to cover the full scrollable page height/width to prevent scrollbar blocking
     const container = document.createElement("div");
     container.id = "visiflow-overlay-container";
     container.style.cssText = `
       position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
+      top: 0; left: 0; 
+      width: ${Math.max(document.documentElement.scrollWidth, window.innerWidth)}px; 
+      height: ${Math.max(document.documentElement.scrollHeight, window.innerHeight)}px;
       pointer-events: none;
       z-index: 2147483647;
     `;
     document.body.appendChild(container);
     activeOverlays.push(container);
+    
+    // Clear overlays automatically on scroll (prevents coordinate offset mismatch)
+    const startScrollX = window.scrollX;
+    const startScrollY = window.scrollY;
+    scrollListener = () => {
+      const diffX = Math.abs(window.scrollX - startScrollX);
+      const diffY = Math.abs(window.scrollY - startScrollY);
+      if (diffX > 10 || diffY > 10) {
+        clearOverlays();
+      }
+    };
+    window.addEventListener("scroll", scrollListener);
     
     const dpr = window.devicePixelRatio || 1;
     
@@ -242,6 +257,10 @@ function clearOverlays() {
   const container = document.getElementById("visiflow-overlay-container");
   if (container) container.remove();
   activeOverlays = [];
+  if (scrollListener) {
+    window.removeEventListener("scroll", scrollListener);
+    scrollListener = null;
+  }
 }
 
 function showPlaybackIndicator(x, y, type) {
