@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 import difflib
@@ -18,6 +19,7 @@ class VisiFlowDetector:
         :param languages: List of languages for EasyOCR. Defaults to Traditional Chinese and English.
         """
         self.use_yolo = use_yolo
+        self.model_path = None
         self.model = None
         self.ocr_reader = None
         self.languages = languages
@@ -36,6 +38,8 @@ class VisiFlowDetector:
                 model_path = "yolo26n.onnx"
             else:
                 model_path = "yolov8n.pt"
+        
+        self.model_path = model_path
         
         try:
             from ultralytics import YOLO
@@ -111,7 +115,9 @@ class VisiFlowDetector:
         elements = []
         if self.model:
             try:
-                results = self.model(img_path, verbose=False)
+                # Force device="cpu" for ONNX models to bypass local GPU execution provider DLL mismatches
+                device = "cpu" if self.model_path and str(self.model_path).endswith(".onnx") else None
+                results = self.model(img_path, device=device, verbose=False)
                 for r in results:
                     boxes = r.boxes
                     for box in boxes:
