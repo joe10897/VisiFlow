@@ -52,6 +52,44 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     });
     return true; // Keep message channel open for asynchronous response
+  } else if (request.action === "resolveTarget") {
+    // Query active tab to locate target visual label coordinates
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (chrome.runtime.lastError || !tabs || !tabs.length) {
+        sendResponse({ found: false, message: "No active tab found" });
+        return;
+      }
+      
+      const windowId = tabs[0].windowId;
+      
+      chrome.tabs.captureVisibleTab(windowId, { format: "png" }, (dataUrl) => {
+        if (chrome.runtime.lastError || !dataUrl) {
+          sendResponse({ found: false, message: "Failed to capture tab screenshot" });
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("image_base64", dataUrl);
+        formData.append("query", request.query);
+
+        fetch("http://localhost:8000/match", {
+          method: "POST",
+          body: formData
+        })
+        .then(resp => {
+          if (!resp.ok) throw new Error("Match request failed");
+          return resp.json();
+        })
+        .then(data => {
+          sendResponse(data);
+        })
+        .catch(err => {
+          console.error("Match API Error:", err);
+          sendResponse({ found: false, message: err.message });
+        });
+      });
+    });
+    return true; // Keep channel open
   }
 });
 

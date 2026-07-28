@@ -13,6 +13,7 @@ const langSelect = document.getElementById("lang-select");
 const copyBtn = document.getElementById("copy-btn");
 const clearBtn = document.getElementById("clear-btn");
 const hideOverlaysBtn = document.getElementById("hide-overlays-btn");
+const runBtn = document.getElementById("run-btn");
 
 let activeTabUrl = "https://example.com";
 
@@ -277,4 +278,72 @@ clearBtn.addEventListener("click", () => {
       }
     });
   }
+});
+
+// Run/Replay Script sequentially in current browser tab
+runBtn.addEventListener("click", async () => {
+  if (!recordedSteps.length) {
+    alert("No steps recorded. Please scan and record some clicks/fills first!");
+    return;
+  }
+  
+  runBtn.disabled = true;
+  runBtn.textContent = "▶️ Running...";
+  scriptBox.value = "// Replaying recorded steps in your browser tab sequentially...";
+  
+  // Hide active overlays first so they don't block element discovery or clicks
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs.length) {
+      chrome.tabs.sendMessage(tabs[0].id, { action: "clearOverlays" });
+    }
+  });
+  
+  // Wait a short time for overlays to fade out
+  await new Promise(r => setTimeout(r, 200));
+
+  for (let i = 0; i < recordedSteps.length; i++) {
+    const step = recordedSteps[i];
+    scriptBox.value += `\n// [Step ${i+1}/${recordedSteps.length}] Finding & executing target: "${step.target}"...`;
+    
+    // 1. Capture screen and query local match API for coordinates of this text/label
+    const res = await new Promise(resolve => {
+      chrome.runtime.sendMessage({ action: "resolveTarget", query: step.target }, resolve);
+    });
+    
+    if (!res || !res.found) {
+      alert(`Playback failed at step ${i+1}: Could not visually find target "${step.target}" on page.`);
+      break;
+    }
+    
+    // 2. Dispatch simulated click or fill event to content.js
+    const dpr = window.devicePixelRatio || 1;
+    await new Promise(resolve => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (!tabs.length) {
+          resolve();
+          return;
+        }
+        
+        chrome.scripting.executeScript({
+          target: { tabId: tabs[0].id },
+          files: ["content.js"]
+        }, () => {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            action: "executePlayback",
+            type: step.action,
+            x: res.x / dpr,
+            y: res.y / dpr,
+            value: step.value
+          }, resolve);
+        });
+      });
+    });
+    
+    // 3. Wait for layout changes, page load, or transitions before doing next step
+    await new Promise(resolve => setTimeout(resolve, 1800));
+  }
+  
+  runBtn.disabled = false;
+  runBtn.textContent = "▶️ Run Script";
+  updateScriptOutput();
 });
