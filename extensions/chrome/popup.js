@@ -71,7 +71,18 @@ function renderStepsList() {
   stepsListContainer.innerHTML = "";
   
   if (recordedSteps.length === 0) {
-    stepsListContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.78rem; text-align: center; padding: 12px 0;">No steps recorded. Scan page and click overlays to add steps.</div>';
+    // Show empty state with an "Add Step" button
+    stepsListContainer.innerHTML = `
+      <div style="color: var(--text-muted); font-size: 0.78rem; text-align: center; padding: 8px 0;">No steps recorded. Scan page and click overlays to add steps.</div>
+      <div style="display:flex; justify-content:center; margin-top:6px;">
+        <div class="step-btn-add" id="add-first-step" title="Add a blank step" style="width:auto; padding:3px 10px; font-size:0.78rem; gap:4px;">＋ Add Step</div>
+      </div>`;
+    document.getElementById("add-first-step").addEventListener("click", () => {
+      recordedSteps.push({ action: "click", target: "", value: null });
+      chrome.storage.local.set({ recordedSteps });
+      renderStepsList();
+      updateScriptOutput();
+    });
     return;
   }
   
@@ -79,13 +90,45 @@ function renderStepsList() {
     const row = document.createElement("div");
     row.className = "step-row";
     
-    // Step Number
+    // ── ↑↓ Order Controls ──────────────────────────────────────
+    const orderCtrl = document.createElement("div");
+    orderCtrl.className = "step-controls";
+
+    const upBtn = document.createElement("button");
+    upBtn.className = "step-btn-move";
+    upBtn.innerHTML = "▲";
+    upBtn.title = "Move up";
+    upBtn.disabled = idx === 0;
+    upBtn.addEventListener("click", () => {
+      [recordedSteps[idx - 1], recordedSteps[idx]] = [recordedSteps[idx], recordedSteps[idx - 1]];
+      chrome.storage.local.set({ recordedSteps });
+      renderStepsList();
+      updateScriptOutput();
+    });
+
+    const downBtn = document.createElement("button");
+    downBtn.className = "step-btn-move";
+    downBtn.innerHTML = "▼";
+    downBtn.title = "Move down";
+    downBtn.disabled = idx === recordedSteps.length - 1;
+    downBtn.addEventListener("click", () => {
+      [recordedSteps[idx + 1], recordedSteps[idx]] = [recordedSteps[idx], recordedSteps[idx + 1]];
+      chrome.storage.local.set({ recordedSteps });
+      renderStepsList();
+      updateScriptOutput();
+    });
+
+    orderCtrl.appendChild(upBtn);
+    orderCtrl.appendChild(downBtn);
+    row.appendChild(orderCtrl);
+
+    // ── Step Number ────────────────────────────────────────────
     const num = document.createElement("div");
     num.className = "step-num";
     num.textContent = idx + 1;
     row.appendChild(num);
     
-    // Action Dropdown (Click or Fill)
+    // ── Action Dropdown (Click or Fill) ────────────────────────
     const select = document.createElement("select");
     select.className = "step-select";
     select.innerHTML = `
@@ -94,16 +137,14 @@ function renderStepsList() {
     `;
     select.addEventListener("change", (e) => {
       step.action = e.target.value;
-      if (step.action === "fill" && !step.value) {
-        step.value = "text";
-      }
-      chrome.storage.local.set({ recordedSteps: recordedSteps });
+      if (step.action === "fill" && !step.value) step.value = "text";
+      chrome.storage.local.set({ recordedSteps });
       renderStepsList();
       updateScriptOutput();
     });
     row.appendChild(select);
     
-    // Target Input (Query text or label)
+    // ── Target Input ───────────────────────────────────────────
     const targetInput = document.createElement("input");
     targetInput.type = "text";
     targetInput.className = "step-input";
@@ -111,12 +152,12 @@ function renderStepsList() {
     targetInput.placeholder = "Visual target label";
     targetInput.addEventListener("input", (e) => {
       step.target = e.target.value;
-      chrome.storage.local.set({ recordedSteps: recordedSteps });
+      chrome.storage.local.set({ recordedSteps });
       updateScriptOutput();
     });
     row.appendChild(targetInput);
     
-    // Value Input (enabled and visible only for Fill action)
+    // ── Value Input (Fill only) ────────────────────────────────
     if (step.action === "fill") {
       const valInput = document.createElement("input");
       valInput.type = "text";
@@ -126,20 +167,33 @@ function renderStepsList() {
       valInput.style.borderColor = "var(--accent-emerald)";
       valInput.addEventListener("input", (e) => {
         step.value = e.target.value;
-        chrome.storage.local.set({ recordedSteps: recordedSteps });
+        chrome.storage.local.set({ recordedSteps });
         updateScriptOutput();
       });
       row.appendChild(valInput);
     }
     
-    // Delete Button
+    // ── + Add Step below ───────────────────────────────────────
+    const addBtn = document.createElement("div");
+    addBtn.className = "step-btn-add";
+    addBtn.innerHTML = "＋";
+    addBtn.title = "Insert a blank step below";
+    addBtn.addEventListener("click", () => {
+      recordedSteps.splice(idx + 1, 0, { action: "click", target: "", value: null });
+      chrome.storage.local.set({ recordedSteps });
+      renderStepsList();
+      updateScriptOutput();
+    });
+    row.appendChild(addBtn);
+
+    // ── Delete Button ──────────────────────────────────────────
     const delBtn = document.createElement("div");
     delBtn.className = "step-btn-del";
     delBtn.innerHTML = "✕";
     delBtn.title = "Delete Step";
     delBtn.addEventListener("click", () => {
       recordedSteps.splice(idx, 1);
-      chrome.storage.local.set({ recordedSteps: recordedSteps });
+      chrome.storage.local.set({ recordedSteps });
       renderStepsList();
       updateScriptOutput();
     });
@@ -148,6 +202,7 @@ function renderStepsList() {
     stepsListContainer.appendChild(row);
   });
 }
+
 
 // Trigger screen capture and local YOLO/OCR element detection
 scanBtn.addEventListener("click", () => {
