@@ -170,6 +170,68 @@
             animation: spin 1s linear infinite;
         }
 
+        .step-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            background: rgba(30, 41, 59, 0.4);
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .step-num {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            width: 14px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .step-select {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border-color);
+            color: white;
+            font-size: 0.75rem;
+            padding: 4px 6px;
+            border-radius: 4px;
+            outline: none;
+            width: 65px;
+            cursor: pointer;
+        }
+
+        .step-input {
+            flex: 1;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border-color);
+            color: white;
+            font-size: 0.75rem;
+            padding: 4px 6px;
+            border-radius: 4px;
+            outline: none;
+            min-width: 60px;
+        }
+
+        .step-btn-del {
+            background: rgba(244, 63, 94, 0.15);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            color: var(--accent-pink);
+            border-radius: 4px;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        .step-btn-del:hover {
+            background: rgba(244, 63, 94, 0.3);
+        }
+
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -190,6 +252,11 @@
             <span>📸 Scan Elements</span>
         </button>
         <button id="hide-overlays-btn" class="btn btn-secondary" style="flex: 1; margin-bottom: 0; padding: 10px 14px; font-size: 0.82rem; white-space: nowrap;">👁️ Hide Boxes</button>
+    </div>
+
+    <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: var(--text-muted);">📝 Steps Editor:</div>
+    <div id="steps-list" style="margin-bottom: 14px; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: rgba(15,23,42,0.2); padding: 8px; border-radius: 8px; border: 1px solid var(--border-color);">
+        <div style="color: var(--text-muted); font-size: 0.78rem; text-align: center; padding: 12px 0;">No steps recorded. Scan page and click overlays to add steps.</div>
     </div>
 
     <div class="config-row">

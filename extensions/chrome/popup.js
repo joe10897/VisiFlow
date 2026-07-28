@@ -14,6 +14,7 @@ const copyBtn = document.getElementById("copy-btn");
 const clearBtn = document.getElementById("clear-btn");
 const hideOverlaysBtn = document.getElementById("hide-overlays-btn");
 const runBtn = document.getElementById("run-btn");
+const stepsListContainer = document.getElementById("steps-list");
 
 let activeTabUrl = "https://example.com";
 
@@ -57,11 +58,94 @@ function loadState() {
   chrome.storage.local.get(["recordedSteps", "selectedLanguage"], (res) => {
     if (res.recordedSteps) {
       recordedSteps = res.recordedSteps;
+      renderStepsList();
       updateScriptOutput();
     }
     if (res.selectedLanguage) {
       langSelect.value = res.selectedLanguage;
     }
+  });
+}
+
+function renderStepsList() {
+  stepsListContainer.innerHTML = "";
+  
+  if (recordedSteps.length === 0) {
+    stepsListContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.78rem; text-align: center; padding: 12px 0;">No steps recorded. Scan page and click overlays to add steps.</div>';
+    return;
+  }
+  
+  recordedSteps.forEach((step, idx) => {
+    const row = document.createElement("div");
+    row.className = "step-row";
+    
+    // Step Number
+    const num = document.createElement("div");
+    num.className = "step-num";
+    num.textContent = idx + 1;
+    row.appendChild(num);
+    
+    // Action Dropdown (Click or Fill)
+    const select = document.createElement("select");
+    select.className = "step-select";
+    select.innerHTML = `
+      <option value="click" ${step.action === "click" ? "selected" : ""}>Click</option>
+      <option value="fill" ${step.action === "fill" ? "selected" : ""}>Fill</option>
+    `;
+    select.addEventListener("change", (e) => {
+      step.action = e.target.value;
+      if (step.action === "fill" && !step.value) {
+        step.value = "text";
+      }
+      chrome.storage.local.set({ recordedSteps: recordedSteps });
+      renderStepsList();
+      updateScriptOutput();
+    });
+    row.appendChild(select);
+    
+    // Target Input (Query text or label)
+    const targetInput = document.createElement("input");
+    targetInput.type = "text";
+    targetInput.className = "step-input";
+    targetInput.value = step.target || "";
+    targetInput.placeholder = "Visual target label";
+    targetInput.addEventListener("input", (e) => {
+      step.target = e.target.value;
+      chrome.storage.local.set({ recordedSteps: recordedSteps });
+      updateScriptOutput();
+    });
+    row.appendChild(targetInput);
+    
+    // Value Input (enabled and visible only for Fill action)
+    if (step.action === "fill") {
+      const valInput = document.createElement("input");
+      valInput.type = "text";
+      valInput.className = "step-input";
+      valInput.value = step.value || "";
+      valInput.placeholder = "Value to type";
+      valInput.style.borderColor = "var(--accent-emerald)";
+      valInput.addEventListener("input", (e) => {
+        step.value = e.target.value;
+        chrome.storage.local.set({ recordedSteps: recordedSteps });
+        updateScriptOutput();
+      });
+      row.appendChild(valInput);
+    }
+    
+    // Delete Button
+    const delBtn = document.createElement("div");
+    delBtn.className = "step-btn-del";
+    delBtn.innerHTML = "✕";
+    delBtn.title = "Delete Step";
+    delBtn.addEventListener("click", () => {
+      recordedSteps.splice(idx, 1);
+      chrome.storage.local.set({ recordedSteps: recordedSteps });
+      renderStepsList();
+      updateScriptOutput();
+    });
+    row.appendChild(delBtn);
+    
+    stepsListContainer.appendChild(row);
   });
 }
 
@@ -170,6 +254,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.storage.local.set({ recordedSteps: recordedSteps });
 
     // Update code textarea
+    renderStepsList();
     updateScriptOutput();
 
     sendResponse({ status: "success" });
@@ -273,6 +358,7 @@ clearBtn.addEventListener("click", () => {
   if (confirm("Are you sure you want to clear all recorded steps?")) {
     recordedSteps = [];
     chrome.storage.local.set({ recordedSteps: [] });
+    renderStepsList();
     updateScriptOutput();
 
     // Clear active overlays if any
@@ -367,5 +453,6 @@ runBtn.addEventListener("click", async () => {
   
   runBtn.disabled = false;
   runBtn.textContent = "▶️ Run Script";
+  renderStepsList();
   updateScriptOutput();
 });
