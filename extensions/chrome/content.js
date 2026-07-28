@@ -21,10 +21,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     document.body.appendChild(container);
     activeOverlays.push(container);
     
+    const dpr = window.devicePixelRatio || 1;
+    
     // Draw YOLO elements (Cyan boxes)
     elements.forEach(elem => {
       const [x1, y1, x2, y2] = elem.box;
-      createOverlayBox(container, x1, y1, x2 - x1, y2 - y1, "#38bdf8", "rgba(56, 189, 248, 0.15)", () => {
+      createOverlayBox(container, x1 / dpr, y1 / dpr, (x2 - x1) / dpr, (y2 - y1) / dpr, "#38bdf8", "rgba(56, 189, 248, 0.15)", () => {
         chrome.runtime.sendMessage({
           action: "recordStep",
           type: "element",
@@ -37,7 +39,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Draw OCR elements (Emerald boxes)
     ocr.forEach(item => {
       const [x1, y1, x2, y2] = item.box;
-      createOverlayBox(container, x1, y1, x2 - x1, y2 - y1, "#34d399", "rgba(52, 211, 153, 0.2)", () => {
+      createOverlayBox(container, x1 / dpr, y1 / dpr, (x2 - x1) / dpr, (y2 - y1) / dpr, "#34d399", "rgba(52, 211, 153, 0.2)", () => {
         chrome.runtime.sendMessage({
           action: "recordStep",
           type: "text",

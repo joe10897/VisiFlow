@@ -54,3 +54,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep message channel open for asynchronous response
   }
 });
+
+// Configure the side panel to open when clicking the extension icon in the toolbar
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch((error) => console.error("Error setting side panel behavior:", error));

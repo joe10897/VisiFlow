@@ -13,9 +13,21 @@ const langSelect = document.getElementById("lang-select");
 const copyBtn = document.getElementById("copy-btn");
 const clearBtn = document.getElementById("clear-btn");
 
+let activeTabUrl = "https://example.com";
+
 // Check connection to local VisiFlow FastAPI server on load
 checkConnection();
 loadState();
+
+// Get the URL of the active webpage tab being recorded
+chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  if (tabs && tabs[0] && tabs[0].url) {
+    // Avoid setting to chrome extension internal page URL
+    if (!tabs[0].url.startsWith("chrome-extension://")) {
+      activeTabUrl = tabs[0].url;
+    }
+  }
+});
 
 function checkConnection() {
   fetch(localServerUrl + "/")
@@ -56,12 +68,14 @@ scanBtn.addEventListener("click", () => {
   if (isScanning) return;
   isScanning = true;
   scanLoader.style.display = "inline-block";
+  scanBtn.innerHTML = '<span class="loader" id="scan-loader" style="display: inline-block;"></span> 🔄 Scanning Page...';
   scanBtn.disabled = true;
+  scriptBox.value = "// Capturing viewport and extracting layout coordinates with local YOLOv26n & EasyOCR models...";
 
   // 1. Tell background service worker to capture viewport and call VisiFlow local server
   chrome.runtime.sendMessage({ action: "captureAndDetect" }, (response) => {
     isScanning = false;
-    scanLoader.style.display = "none";
+    scanBtn.innerHTML = '<span>📸 Scan Web Elements</span>';
     scanBtn.disabled = false;
 
     if (!response || response.status === "error") {
@@ -189,7 +203,7 @@ function updateScriptOutput() {
     codeLines.push("with sync_playwright() as p:");
     codeLines.push("    browser = p.chromium.launch(headless=False)");
     codeLines.push("    page = browser.new_page()");
-    codeLines.push("    page.goto(window.location.href) # Replace with URL");
+    codeLines.push(`    page.goto("${activeTabUrl}")`);
     codeLines.push("    v = VisiPlaywrightPage(page)\n");
     
     recordedSteps.forEach(step => {
@@ -204,7 +218,7 @@ function updateScriptOutput() {
     codeLines.push("from selenium import webdriver");
     codeLines.push("from visiflow import VisiSeleniumDriver\n");
     codeLines.push("driver = webdriver.Chrome()");
-    codeLines.push("driver.get(window.location.href) # Replace with URL");
+    codeLines.push(`driver.get("${activeTabUrl}")`);
     codeLines.push("v = VisiSeleniumDriver(driver)\n");
     
     recordedSteps.forEach(step => {
@@ -221,7 +235,7 @@ function updateScriptOutput() {
     codeLines.push("(async () => {");
     codeLines.push("    const browser = await chromium.launch({ headless: false });");
     codeLines.push("    const page = await browser.newPage();");
-    codeLines.push("    await page.goto(process.env.URL); // Replace with URL");
+    codeLines.push(`    await page.goto('${activeTabUrl}');`);
     codeLines.push("    const v = new VisiPage(page);\n");
     
     recordedSteps.forEach(step => {
