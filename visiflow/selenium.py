@@ -7,15 +7,17 @@ from .core import VisiFlowDetector, logger
 from .reporter import global_reporter
 
 class VisiSeleniumDriver:
-    def __init__(self, driver: Any, detector: Optional[VisiFlowDetector] = None):
+    def __init__(self, driver: Any, detector: Optional[VisiFlowDetector] = None, hybrid_fallback: bool = True):
         """
         Wrapper/Helper for Selenium WebDriver to add visual action and assertion capabilities.
         
         :param driver: The Selenium WebDriver instance
         :param detector: An optional custom VisiFlowDetector instance
+        :param hybrid_fallback: Whether to use DOM/accessibility as smart fallback if visual OCR fails
         """
         self.driver = driver
         self.detector = detector or VisiFlowDetector()
+        self.hybrid_fallback = hybrid_fallback
 
     def _capture_temp_screenshot(self) -> Optional[str]:
         try:
@@ -57,6 +59,7 @@ class VisiSeleniumDriver:
     ) -> Optional[tuple]:
         """
         Take a screenshot, run visual detection, scale coordinates to page viewport, and return them.
+        Includes Hybrid Fallback to DOM/accessibility if visual recognition fails.
         """
         fd, temp_path = tempfile.mkstemp(suffix=".png")
         os.close(fd)
@@ -98,6 +101,39 @@ class VisiSeleniumDriver:
                 target_desc = self._format_target_desc(text_or_label, right_of, left_of, below, above, index)
                 logger.info(f"Resolved visual target '{target_desc}' from screen ({cx}, {cy}) to logical browser ({px}, {py})")
                 return px, py
+
+            # 5. Hybrid Fallback: Query DOM/Accessibility if vision cannot locate target
+            if self.hybrid_fallback:
+                try:
+                    for by, val in [
+                        ("link text", text_or_label),
+                        ("xpath", f"//*[contains(text(), '{text_or_label}')]"),
+                        ("xpath", f"//*[@placeholder='{text_or_label}']"),
+                        ("xpath", f"//*[@aria-label='{text_or_label}']")
+                    ]:
+                        try:
+                            elems = self.driver.find_elements(by, val)
+                            for el in elems:
+                                if el.is_displayed():
+                                    loc = el.location
+                                    size = el.size
+                                    px = int(loc["x"] + size["width"] / 2)
+                                    py = int(loc["y"] + size["height"] / 2)
+                                    target_desc = self._format_target_desc(text_or_label, right_of, left_of, below, above, index)
+                                    logger.info(f"Hybrid Fallback: located target '{target_desc}' via DOM at ({px}, {py})")
+                                    self.detector.last_match = {
+                                        "found": True,
+                                        "query": text_or_label,
+                                        "score": 0.85,
+                                        "matched_text": f"dom:{text_or_label}",
+                                        "healed": True
+                                    }
+                                    return px, py
+                        except Exception:
+                            continue
+                except Exception as e:
+                    logger.debug(f"DOM fallback attempt failed: {e}")
+
             return None
         finally:
             if os.path.exists(temp_path):

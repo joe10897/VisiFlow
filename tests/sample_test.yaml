@@ -1,0 +1,16 @@
+name: "E2E Visual & Spatial Automation Test"
+description: "Demonstration of VisiFlow YAML Runner with form filling and spatial table clicking"
+headless: true
+report: "tests/yaml_test_report.html"
+
+steps:
+  - goto: "file:///C:/Users/USER/Desktop/VisiFlow/tests/index.html"
+  - fill: "Username"
+    value: "yaml_runner_user"
+  - fill: "Password"
+    value: "runner_pass_999"
+  - click: "Submit"
+  - assert_visible: "Logged in successfully!"
+  - click: "Delete"
+    right_of: "Alice Smith"
+  - assert_visible: "Deleted user Alice Smith!"

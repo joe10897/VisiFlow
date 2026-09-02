@@ -352,13 +352,78 @@ VisiFlow natively supports the **Model Context Protocol (MCP)**, allowing AI too
 
 ---
 
+## ⚡ Declarative YAML Test Runner (`visiflow run`) (New in v0.9.0)
+
+Want to automate tests without writing Python or JavaScript code? VisiFlow features a **No-Code Declarative YAML Test Runner**. Anyone on your team (QA engineers, Product Managers, SDETs) can author and execute tests using human-readable YAML:
+
+```yaml
+name: "E-Commerce Checkout Flow"
+description: "Verify user login and spatial table actions"
+headless: true
+report: "checkout_report.html"
+
+steps:
+  - goto: "https://example.com/login"
+  - fill: "Username"
+    value: "qa_engineer"
+  - fill: "Password"
+    value: "super_secret"
+  - click: "Submit"
+  - assert_visible: "Welcome back!"
+  - click: "Delete"
+    right_of: "Alice Smith"
+  - assert_visible: "Deleted user Alice Smith!"
+```
+
+### Run in Terminal or CI/CD
+```bash
+# Run YAML test and generate self-healing HTML report
+visiflow run checkout.yaml
+
+# Run with visible browser
+visiflow run checkout.yaml --headed
+
+# Specify custom report path
+visiflow run checkout.yaml --report my_report.html
+```
+
+---
+
+## 🖥️ VisiDesktop: OS & Desktop App Automation (New in v0.9.0)
+
+VisiFlow extends beyond the browser. With **VisiDesktop**, you can visually automate native OS applications (Windows, macOS, Linux), Electron apps, and native system file dialogs:
+
+```bash
+pip install "visiflow[desktop]"
+```
+
+```python
+from visiflow import VisiDesktop
+
+desktop = VisiDesktop()
+
+# Click on desktop application buttons visually
+desktop.click("File")
+desktop.click("Save As...", below="File")
+
+# Fill native text fields
+desktop.fill("File name:", "Quarterly_Report_2026.pdf")
+desktop.press("Enter")
+
+# Assert UI state
+desktop.assert_visible("Saved successfully")
+```
+
+---
+
 ## 🛠️ CLI Reference
 
 VisiFlow comes with a CLI tool:
 
+- `visiflow run <test.yaml> [--headed] [--report report.html]`: **(New)** Execute declarative YAML/JSON visual tests with HTML reports.
+- `visiflow mcp`: **(New)** Start the Model Context Protocol (MCP) stdio server for AI agents.
 - `visiflow server [--port 8000]`: Start the local HTTP vision daemon for cross-language bindings.
 - `visiflow ui`: Launch the interactive Web Playground UI in your browser.
-- `visiflow mcp`: **(New)** Start the Model Context Protocol (MCP) stdio server for AI agents.
 - `visiflow match <screenshot_path> <query>`: Test matching query coordinates directly from terminal.
 
 ---
@@ -369,13 +434,15 @@ VisiFlow comes with a CLI tool:
 
 | Class | Method | Description |
 | :--- | :--- | :--- |
-| `VisiPlaywrightPage` | `visual_click(text, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=10000)` | Click an element by visible text label with optional spatial constraints |
+| `VisiPlaywrightPage` | `visual_click(text, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=10000)` | Click an element by visible text label with spatial constraints & hybrid fallback |
 | | `visual_fill(text, value, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=10000)` | Fill an input field located by visible text |
 | | `visual_press(key)` | Press a keyboard key (e.g. `"Enter"`, `"{enter}"`, `"Backspace"`) on the active element |
 | | `visual_wait_for(text, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=10000)` | Wait for text to become visible |
 | | `visual_assert_visible(text, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=10000)` | Assert text is visible on screen |
 | | `visual_assert_not_visible(text, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=5000)` | Assert text is NOT visible on screen |
-| `VisiSeleniumDriver` | *(Same API as above)* | Works with Selenium WebDriver |
+| `VisiSeleniumDriver` | *(Same API as above)* | Works with Selenium WebDriver with hybrid DOM fallback |
+| `VisiDesktop` | `click(text, ...)`, `fill(text, val)`, `press(key)`, `assert_visible(text)` | Visual automation for native Desktop OS applications |
+| `VisiFlowYAMLRunner` | `load_file(path)`, `execute(...)` | Programmatic executor for declarative YAML/JSON tests |
 | `global_reporter` | `generate_html_report(output_path)` | Generate self-healing HTML test report |
 
 ### Node.js API (`visiflow-js`)

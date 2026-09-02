@@ -31,6 +31,14 @@ def main():
     # Subcommand: mcp
     mcp_parser = subparsers.add_parser("mcp", help="Start the VisiFlow Model Context Protocol (MCP) Stdio server for AI agents (Cursor, Claude Desktop)")
 
+    # Subcommand: run
+    run_parser = subparsers.add_parser("run", help="Execute a declarative YAML or JSON visual E2E test file")
+    run_parser.add_argument("test_file", help="Path to YAML/JSON test file (e.g. test.yaml)")
+    run_parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
+    run_parser.add_argument("--headed", action="store_true", help="Run browser with visible UI")
+    run_parser.add_argument("--report", default=None, help="Output path for self-healing HTML report")
+    run_parser.add_argument("--browser", default="chromium", choices=["chromium", "firefox", "webkit"], help="Browser engine")
+
     # Clean raw args to prevent wrapper script path artifacts
     raw_args = sys.argv[1:]
     while raw_args and ("visiflow" in raw_args[0].lower() or raw_args[0].endswith(".exe")):
@@ -49,6 +57,12 @@ def main():
     elif args.command == "mcp":
         from .mcp import start_mcp_server
         start_mcp_server()
+    elif args.command == "run":
+        from .runner import VisiFlowYAMLRunner
+        runner = VisiFlowYAMLRunner(args.test_file)
+        headless = True if args.headless else (False if args.headed else None)
+        success = runner.execute(headless=headless, report_path=args.report, browser_type=args.browser)
+        sys.exit(0 if success else 1)
     elif args.command == "match":
         img_path = Path(args.image)
         if not img_path.exists():

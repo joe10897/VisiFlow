@@ -7,15 +7,17 @@ from .core import VisiFlowDetector, logger
 from .reporter import global_reporter
 
 class VisiPlaywrightPage:
-    def __init__(self, page: Any, detector: Optional[VisiFlowDetector] = None):
+    def __init__(self, page: Any, detector: Optional[VisiFlowDetector] = None, hybrid_fallback: bool = True):
         """
         Wrapper for Playwright Page to add visual action and assertion capabilities.
         
         :param page: The playwright Page object
         :param detector: An optional custom VisiFlowDetector instance
+        :param hybrid_fallback: Whether to use Accessibility Tree as smart fallback if visual OCR fails
         """
         self.page = page
         self.detector = detector or VisiFlowDetector()
+        self.hybrid_fallback = hybrid_fallback
 
     def _capture_temp_screenshot(self) -> Optional[str]:
         try:
@@ -57,6 +59,7 @@ class VisiPlaywrightPage:
     ) -> Optional[tuple]:
         """
         Take a screenshot, run visual detection, scale coordinates to page viewport, and return them.
+        Includes Hybrid Fallback to Accessibility Tree if visual recognition fails.
         """
         # 1. Capture screen to a temporary file
         fd, temp_path = tempfile.mkstemp(suffix=".png")
@@ -97,6 +100,38 @@ class VisiPlaywrightPage:
                 target_desc = self._format_target_desc(text_or_label, right_of, left_of, below, above, index)
                 logger.info(f"Resolved visual target '{target_desc}' from screen ({cx}, {cy}) to logical browser ({px}, {py})")
                 return px, py
+
+            # 5. Hybrid Fallback: Query Accessibility Tree if vision cannot locate target
+            if self.hybrid_fallback:
+                try:
+                    locators = [
+                        self.page.get_by_text(text_or_label, exact=False).first,
+                        self.page.get_by_label(text_or_label, exact=False).first,
+                        self.page.get_by_placeholder(text_or_label, exact=False).first,
+                        self.page.get_by_role("button", name=text_or_label, exact=False).first
+                    ]
+                    for loc in locators:
+                        try:
+                            if loc.is_visible(timeout=400):
+                                box = loc.bounding_box()
+                                if box and box["width"] > 0 and box["height"] > 0:
+                                    px = int(box["x"] + box["width"] / 2)
+                                    py = int(box["y"] + box["height"] / 2)
+                                    target_desc = self._format_target_desc(text_or_label, right_of, left_of, below, above, index)
+                                    logger.info(f"Hybrid Fallback: located target '{target_desc}' via Accessibility Tree at ({px}, {py})")
+                                    self.detector.last_match = {
+                                        "found": True,
+                                        "query": text_or_label,
+                                        "score": 0.85,
+                                        "matched_text": f"a11y:{text_or_label}",
+                                        "healed": True
+                                    }
+                                    return px, py
+                        except Exception:
+                            continue
+                except Exception as e:
+                    logger.debug(f"Accessibility fallback error: {e}")
+
             return None
         finally:
             if os.path.exists(temp_path):
