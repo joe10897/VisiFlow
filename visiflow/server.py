@@ -52,11 +52,16 @@ def read_root():
 async def match_target(
     file: Optional[UploadFile] = File(None),
     image_base64: Optional[str] = Form(None),
-    query: str = Form(...)
+    query: str = Form(...),
+    right_of: Optional[str] = Form(None),
+    left_of: Optional[str] = Form(None),
+    below: Optional[str] = Form(None),
+    above: Optional[str] = Form(None),
+    index: Optional[int] = Form(None)
 ):
     """
     Match a target query string against a screenshot image and return the resolved viewport coordinates.
-    Accepts either file upload or base64 encoded image string.
+    Accepts either file upload or base64 encoded image string, with optional spatial relative positioning.
     """
     detector = get_detector()
     
@@ -79,7 +84,15 @@ async def match_target(
         else:
             raise HTTPException(status_code=400, detail="Either 'file' or 'image_base64' must be provided.")
             
-        coords = detector.find_element_by_text(temp_path, query)
+        coords = detector.find_element_by_text(
+            temp_path,
+            query,
+            right_of=right_of,
+            left_of=left_of,
+            below=below,
+            above=above,
+            index=index
+        )
         if coords:
             return {"found": True, "x": coords[0], "y": coords[1], "query": query}
         return {"found": False, "x": None, "y": None, "query": query}
@@ -187,6 +200,11 @@ class StepModel(BaseModel):
     action: str
     target: str
     value: Optional[str] = None
+    right_of: Optional[str] = None
+    left_of: Optional[str] = None
+    below: Optional[str] = None
+    above: Optional[str] = None
+    index: Optional[int] = None
 
 class RunScriptRequest(BaseModel):
     url: str
@@ -242,7 +260,15 @@ async def run_script(req: RunScriptRequest):
                     scale_x = viewport["width"] / sw
                     scale_y = viewport["height"] / sh
                     
-                    coords = detector.find_element_by_text(temp_path, step.target)
+                    coords = detector.find_element_by_text(
+                        temp_path,
+                        step.target,
+                        right_of=step.right_of,
+                        left_of=step.left_of,
+                        below=step.below,
+                        above=step.above,
+                        index=step.index
+                    )
                     if not coords:
                         raise Exception(f"Could not visually find target '{step.target}' on page.")
                     

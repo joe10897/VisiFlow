@@ -27,7 +27,34 @@ class VisiSeleniumDriver:
             logger.error(f"Failed to capture temporary screenshot: {e}")
             return None
 
-    def _resolve_coordinates(self, text_or_label: str) -> Optional[tuple]:
+    def _format_target_desc(
+        self,
+        text_or_label: str,
+        right_of: Optional[str] = None,
+        left_of: Optional[str] = None,
+        below: Optional[str] = None,
+        above: Optional[str] = None,
+        index: Optional[int] = None
+    ) -> str:
+        spatial_parts = []
+        if right_of: spatial_parts.append(f"right_of='{right_of}'")
+        if left_of: spatial_parts.append(f"left_of='{left_of}'")
+        if below: spatial_parts.append(f"below='{below}'")
+        if above: spatial_parts.append(f"above='{above}'")
+        if index is not None: spatial_parts.append(f"index={index}")
+        if spatial_parts:
+            return f"{text_or_label} ({', '.join(spatial_parts)})"
+        return text_or_label
+
+    def _resolve_coordinates(
+        self,
+        text_or_label: str,
+        right_of: Optional[str] = None,
+        left_of: Optional[str] = None,
+        below: Optional[str] = None,
+        above: Optional[str] = None,
+        index: Optional[int] = None
+    ) -> Optional[tuple]:
         """
         Take a screenshot, run visual detection, scale coordinates to page viewport, and return them.
         """
@@ -54,13 +81,22 @@ class VisiSeleniumDriver:
                 scale_x = viewport["width"] / sw
                 scale_y = viewport["height"] / sh
             
-            # 4. Detect target element coordinates
-            coords = self.detector.find_element_by_text(temp_path, text_or_label)
+            # 4. Detect target element coordinates with spatial constraints
+            coords = self.detector.find_element_by_text(
+                temp_path,
+                text_or_label,
+                right_of=right_of,
+                left_of=left_of,
+                below=below,
+                above=above,
+                index=index
+            )
             if coords:
                 cx, cy = coords
                 px = int(cx * scale_x)
                 py = int(cy * scale_y)
-                logger.info(f"Resolved visual target '{text_or_label}' from screen ({cx}, {cy}) to logical browser ({px}, {py})")
+                target_desc = self._format_target_desc(text_or_label, right_of, left_of, below, above, index)
+                logger.info(f"Resolved visual target '{target_desc}' from screen ({cx}, {cy}) to logical browser ({px}, {py})")
                 return px, py
             return None
         finally:
@@ -70,12 +106,22 @@ class VisiSeleniumDriver:
                 except Exception:
                     pass
 
-    def visual_click(self, text_or_label: str, timeout_ms: int = 10000) -> bool:
+    def visual_click(
+        self,
+        text_or_label: str,
+        right_of: Optional[str] = None,
+        left_of: Optional[str] = None,
+        below: Optional[str] = None,
+        above: Optional[str] = None,
+        index: Optional[int] = None,
+        timeout_ms: int = 10000
+    ) -> bool:
         """
-        Locate an element visually by text/label and click it.
+        Locate an element visually by text/label (with optional spatial constraints) and click it.
         """
+        target_desc = self._format_target_desc(text_or_label, right_of, left_of, below, above, index)
         screenshot_before = self._capture_temp_screenshot()
-        step_idx = global_reporter.start_step("click", text_or_label, screenshot_before)
+        step_idx = global_reporter.start_step("click", target_desc, screenshot_before)
         if screenshot_before and os.path.exists(screenshot_before):
             try:
                 os.remove(screenshot_before)
@@ -84,7 +130,14 @@ class VisiSeleniumDriver:
 
         start = time.time()
         while time.time() - start < (timeout_ms / 1000.0):
-            coords = self._resolve_coordinates(text_or_label)
+            coords = self._resolve_coordinates(
+                text_or_label,
+                right_of=right_of,
+                left_of=left_of,
+                below=below,
+                above=above,
+                index=index
+            )
             if coords:
                 x, y = coords
                 clicked = self.driver.execute_script(
@@ -92,14 +145,14 @@ class VisiSeleniumDriver:
                 )
                 success = False
                 if clicked:
-                    logger.info(f"Successfully performed JS visual_click on '{text_or_label}' at ({x}, {y})")
+                    logger.info(f"Successfully performed JS visual_click on '{target_desc}' at ({x}, {y})")
                     success = True
                 else:
                     try:
                         from selenium.webdriver.common.action_chains import ActionChains
                         body = self.driver.find_element("tag name", "body")
                         ActionChains(self.driver).move_to_element_with_offset(body, x, y).click().perform()
-                        logger.info(f"Successfully performed ActionChains visual_click on '{text_or_label}' at ({x}, {y})")
+                        logger.info(f"Successfully performed ActionChains visual_click on '{target_desc}' at ({x}, {y})")
                         success = True
                     except Exception as e:
                         logger.warning(f"ActionChains click fallback failed: {e}")
@@ -112,7 +165,7 @@ class VisiSeleniumDriver:
                         success=True,
                         score=match_data.get("score", 1.0),
                         healed=match_data.get("healed", False),
-                        original_match=text_or_label,
+                        original_match=target_desc,
                         healed_match=match_data.get("matched_text", text_or_label),
                         screenshot_path_after=screenshot_after
                     )
@@ -124,8 +177,8 @@ class VisiSeleniumDriver:
                     return True
             time.sleep(0.5)
         
-        global_reporter.end_step(step_idx, success=False, score=0.0, healed=False, original_match=text_or_label, healed_match="")
-        raise TimeoutError(f"Could not locate element with text/label '{text_or_label}' visually within {timeout_ms}ms")
+        global_reporter.end_step(step_idx, success=False, score=0.0, healed=False, original_match=target_desc, healed_match="")
+        raise TimeoutError(f"Could not locate element '{target_desc}' visually within {timeout_ms}ms")
 
     def visual_press(self, key: str) -> bool:
         """
@@ -149,12 +202,23 @@ class VisiSeleniumDriver:
         logger.info(f"Successfully pressed keyboard key: {clean_key}")
         return True
 
-    def visual_fill(self, text_or_label: str, value: str, timeout_ms: int = 10000) -> bool:
+    def visual_fill(
+        self,
+        text_or_label: str,
+        value: str,
+        right_of: Optional[str] = None,
+        left_of: Optional[str] = None,
+        below: Optional[str] = None,
+        above: Optional[str] = None,
+        index: Optional[int] = None,
+        timeout_ms: int = 10000
+    ) -> bool:
         """
-        Locate an input box visually, click it, clear it, and type the value.
+        Locate an input box visually (with optional spatial constraints), click it, clear it, and type the value.
         """
+        target_desc = self._format_target_desc(text_or_label, right_of, left_of, below, above, index)
         screenshot_before = self._capture_temp_screenshot()
-        step_idx = global_reporter.start_step("fill", f"{text_or_label} -> {value}", screenshot_before)
+        step_idx = global_reporter.start_step("fill", f"{target_desc} -> {value}", screenshot_before)
         if screenshot_before and os.path.exists(screenshot_before):
             try:
                 os.remove(screenshot_before)
@@ -163,7 +227,14 @@ class VisiSeleniumDriver:
 
         start = time.time()
         while time.time() - start < (timeout_ms / 1000.0):
-            coords = self._resolve_coordinates(text_or_label)
+            coords = self._resolve_coordinates(
+                text_or_label,
+                right_of=right_of,
+                left_of=left_of,
+                below=below,
+                above=above,
+                index=index
+            )
             if coords:
                 x, y = coords
                 focused = self.driver.execute_script(
@@ -186,7 +257,7 @@ class VisiSeleniumDriver:
                     actions.send_keys(Keys.BACKSPACE * 100)
                     actions.send_keys(value)
                     actions.perform()
-                    logger.info(f"Successfully performed visual_fill on '{text_or_label}' with value '{value}'")
+                    logger.info(f"Successfully performed visual_fill on '{target_desc}' with value '{value}'")
                     
                     match_data = self.detector.last_match or {"score": 1.0, "healed": False, "matched_text": text_or_label}
                     screenshot_after = self._capture_temp_screenshot()
@@ -195,7 +266,7 @@ class VisiSeleniumDriver:
                         success=True,
                         score=match_data.get("score", 1.0),
                         healed=match_data.get("healed", False),
-                        original_match=text_or_label,
+                        original_match=target_desc,
                         healed_match=match_data.get("matched_text", text_or_label),
                         screenshot_path_after=screenshot_after
                     )
@@ -207,29 +278,56 @@ class VisiSeleniumDriver:
                     return True
             time.sleep(0.5)
             
-        global_reporter.end_step(step_idx, success=False, score=0.0, healed=False, original_match=text_or_label, healed_match="")
-        raise TimeoutError(f"Could not locate input field with text/label '{text_or_label}' visually within {timeout_ms}ms")
+        global_reporter.end_step(step_idx, success=False, score=0.0, healed=False, original_match=target_desc, healed_match="")
+        raise TimeoutError(f"Could not locate input field '{target_desc}' visually within {timeout_ms}ms")
 
-    def visual_wait_for(self, text_or_label: str, timeout_ms: int = 10000) -> bool:
+    def visual_wait_for(
+        self,
+        text_or_label: str,
+        right_of: Optional[str] = None,
+        left_of: Optional[str] = None,
+        below: Optional[str] = None,
+        above: Optional[str] = None,
+        index: Optional[int] = None,
+        timeout_ms: int = 10000
+    ) -> bool:
         """
         Wait for an element to be visually present on the page.
         """
+        target_desc = self._format_target_desc(text_or_label, right_of, left_of, below, above, index)
         start = time.time()
         while time.time() - start < (timeout_ms / 1000.0):
-            coords = self._resolve_coordinates(text_or_label)
+            coords = self._resolve_coordinates(
+                text_or_label,
+                right_of=right_of,
+                left_of=left_of,
+                below=below,
+                above=above,
+                index=index
+            )
             if coords:
-                logger.info(f"Visual element '{text_or_label}' is now present.")
+                logger.info(f"Visual element '{target_desc}' is now present.")
                 return True
             time.sleep(0.5)
             
-        raise TimeoutError(f"Timed out waiting for visual element '{text_or_label}' to be present within {timeout_ms}ms")
+        raise TimeoutError(f"Timed out waiting for visual element '{target_desc}' to be present within {timeout_ms}ms")
 
-    def visual_assert_visible(self, text_or_label: str, timeout_ms: int = 10000) -> bool:
+    def visual_assert_visible(
+        self,
+        text_or_label: str,
+        right_of: Optional[str] = None,
+        left_of: Optional[str] = None,
+        below: Optional[str] = None,
+        above: Optional[str] = None,
+        index: Optional[int] = None,
+        timeout_ms: int = 10000
+    ) -> bool:
         """
         Assert that an element is visually visible on the page.
         """
+        target_desc = self._format_target_desc(text_or_label, right_of, left_of, below, above, index)
         screenshot_before = self._capture_temp_screenshot()
-        step_idx = global_reporter.start_step("assert_visible", text_or_label, screenshot_before)
+        step_idx = global_reporter.start_step("assert_visible", target_desc, screenshot_before)
         if screenshot_before and os.path.exists(screenshot_before):
             try:
                 os.remove(screenshot_before)
@@ -237,7 +335,15 @@ class VisiSeleniumDriver:
                 pass
 
         try:
-            self.visual_wait_for(text_or_label, timeout_ms)
+            self.visual_wait_for(
+                text_or_label,
+                right_of=right_of,
+                left_of=left_of,
+                below=below,
+                above=above,
+                index=index,
+                timeout_ms=timeout_ms
+            )
             match_data = self.detector.last_match or {"score": 1.0, "healed": False, "matched_text": text_or_label}
             screenshot_after = self._capture_temp_screenshot()
             global_reporter.end_step(
@@ -245,7 +351,7 @@ class VisiSeleniumDriver:
                 success=True,
                 score=match_data.get("score", 1.0),
                 healed=match_data.get("healed", False),
-                original_match=text_or_label,
+                original_match=target_desc,
                 healed_match=match_data.get("matched_text", text_or_label),
                 screenshot_path_after=screenshot_after
             )
@@ -256,15 +362,25 @@ class VisiSeleniumDriver:
                     pass
             return True
         except Exception as e:
-            global_reporter.end_step(step_idx, success=False, score=0.0, healed=False, original_match=text_or_label, healed_match="")
-            raise AssertionError(f"Visual assertion failed: '{text_or_label}' is not visible on the page. Error: {e}")
+            global_reporter.end_step(step_idx, success=False, score=0.0, healed=False, original_match=target_desc, healed_match="")
+            raise AssertionError(f"Visual assertion failed: '{target_desc}' is not visible on the page. Error: {e}")
 
-    def visual_assert_not_visible(self, text_or_label: str, timeout_ms: int = 5000) -> bool:
+    def visual_assert_not_visible(
+        self,
+        text_or_label: str,
+        right_of: Optional[str] = None,
+        left_of: Optional[str] = None,
+        below: Optional[str] = None,
+        above: Optional[str] = None,
+        index: Optional[int] = None,
+        timeout_ms: int = 5000
+    ) -> bool:
         """
         Assert that an element is NOT visually visible on the page.
         """
+        target_desc = self._format_target_desc(text_or_label, right_of, left_of, below, above, index)
         screenshot_before = self._capture_temp_screenshot()
-        step_idx = global_reporter.start_step("assert_not_visible", text_or_label, screenshot_before)
+        step_idx = global_reporter.start_step("assert_not_visible", target_desc, screenshot_before)
         if screenshot_before and os.path.exists(screenshot_before):
             try:
                 os.remove(screenshot_before)
@@ -274,7 +390,14 @@ class VisiSeleniumDriver:
         start = time.time()
         while time.time() - start < (timeout_ms / 1000.0):
             try:
-                coords = self._resolve_coordinates(text_or_label)
+                coords = self._resolve_coordinates(
+                    text_or_label,
+                    right_of=right_of,
+                    left_of=left_of,
+                    below=below,
+                    above=above,
+                    index=index
+                )
                 if not coords:
                     screenshot_after = self._capture_temp_screenshot()
                     global_reporter.end_step(
@@ -282,7 +405,7 @@ class VisiSeleniumDriver:
                         success=True,
                         score=1.0,
                         healed=False,
-                        original_match=text_or_label,
+                        original_match=target_desc,
                         healed_match="",
                         screenshot_path_after=screenshot_after
                     )
@@ -296,5 +419,5 @@ class VisiSeleniumDriver:
                 pass
             time.sleep(0.5)
 
-        global_reporter.end_step(step_idx, success=False, score=0.0, healed=False, original_match=text_or_label, healed_match="")
-        raise AssertionError(f"Visual assertion failed: '{text_or_label}' is still visible on the page after {timeout_ms}ms")
+        global_reporter.end_step(step_idx, success=False, score=0.0, healed=False, original_match=target_desc, healed_match="")
+        raise AssertionError(f"Visual assertion failed: '{target_desc}' is still visible on the page after {timeout_ms}ms")

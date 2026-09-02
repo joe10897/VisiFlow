@@ -243,13 +243,63 @@ class VisiFlowDetector:
             logger.error(f"OCR execution error: {e}\n{traceback.format_exc()}")
             return []
 
-    def find_element_by_text(self, img_path: str, query_text: str, fuzzy_threshold: float = 0.6) -> Optional[Tuple[int, int]]:
+    def _compute_text_score(self, query_text: str, target_text: str) -> float:
+        """
+        Compute similarity score between query text and target text.
+        Includes whitespace normalization, substring matching, difflib similarity,
+        and CJK character overlap tolerance.
+        """
+        query_lower = query_text.lower()
+        query_clean = "".join(query_lower.split())
+        query_chars = set(query_clean)
+        
+        target_lower = target_text.lower()
+        target_clean = "".join(target_lower.split())
+        target_chars = set(target_clean)
+        
+        if not query_clean or not target_clean:
+            return 0.0
+            
+        # Exact or substring match yields full score
+        if query_lower in target_lower or query_clean in target_clean:
+            return 1.0
+            
+        score_raw = difflib.SequenceMatcher(None, query_lower, target_lower).ratio()
+        score_clean = difflib.SequenceMatcher(None, query_clean, target_clean).ratio()
+        score = max(score_raw, score_clean)
+        
+        # CJK character set overlap fallback
+        is_cjk = any(0x4e00 <= ord(c) <= 0x9fff for c in query_clean)
+        if is_cjk and query_chars and target_chars:
+            overlap_ratio = len(query_chars & target_chars) / len(query_chars)
+            if overlap_ratio >= 0.5:
+                score = max(score, overlap_ratio * 0.85)
+                
+        return score
+
+    def find_element_by_text(
+        self,
+        img_path: str,
+        query_text: str,
+        fuzzy_threshold: float = 0.6,
+        right_of: Optional[str] = None,
+        left_of: Optional[str] = None,
+        below: Optional[str] = None,
+        above: Optional[str] = None,
+        index: Optional[int] = None
+    ) -> Optional[Tuple[int, int]]:
         """
         Find target element coordinates by searching for text, matching with YOLO/OpenCV bounding boxes.
+        Supports spatial relative positioning (right_of, left_of, below, above) and ordinal indexing.
         
         :param img_path: Path to browser screenshot.
-        :param query_text: Target text to look for (e.g. "Submit", "登入", "威脅數").
+        :param query_text: Target text to look for (e.g. "Submit", "登入", "Delete").
         :param fuzzy_threshold: Levenshtein/Gestalt similarity threshold (0.0 to 1.0).
+        :param right_of: Text label of an anchor element that the target must be to the right of.
+        :param left_of: Text label of an anchor element that the target must be to the left of.
+        :param below: Text label of an anchor element that the target must be below.
+        :param above: Text label of an anchor element that the target must be above.
+        :param index: 0-based ordinal index among matching candidates (e.g. 0 for first, 1 for second).
         :return: Center coordinates (x, y) of the matched element, or None if not found.
         """
         ocr_results = self.run_ocr(img_path)
@@ -257,39 +307,110 @@ class VisiFlowDetector:
             logger.warning("No OCR text detected.")
             return None
 
-        # 1. Look for fuzzy text match with whitespace normalization & CJK character set overlap
-        best_match = None
-        best_score = 0.0
-        
-        query_lower = query_text.lower()
-        query_clean = "".join(query_lower.split())
-        query_chars = set(query_clean)
-        
+        # 1. Collect all candidate OCR matches satisfying fuzzy threshold
+        candidates = []
         for ocr_item in ocr_results:
-            text = ocr_item["text"]
-            text_lower = text.lower()
-            text_clean = "".join(text_lower.split())
-            text_chars = set(text_clean)
+            score = self._compute_text_score(query_text, ocr_item["text"])
+            if score >= fuzzy_threshold:
+                candidates.append({
+                    "item": ocr_item,
+                    "score": score,
+                    "box": ocr_item["box"]
+                })
+
+        best_match = None
+        has_spatial = any([right_of, left_of, below, above])
+
+        if candidates and has_spatial:
+            # Spatial relative positioning
+            anchor_target = right_of or left_of or below or above
+            anchor_candidates = []
+            for ocr_item in ocr_results:
+                s = self._compute_text_score(anchor_target, ocr_item["text"])
+                if s >= fuzzy_threshold:
+                    anchor_candidates.append({"item": ocr_item, "score": s, "box": ocr_item["box"]})
             
-            # Substring match (with or without spaces) yields full score
-            if query_lower in text_lower or (query_clean and query_clean in text_clean):
-                score = 1.0
-            else:
-                score_raw = difflib.SequenceMatcher(None, query_lower, text_lower).ratio()
-                score_clean = difflib.SequenceMatcher(None, query_clean, text_clean).ratio() if query_clean else 0.0
-                score = max(score_raw, score_clean)
-                
-                # CJK character set overlap fallback (handles minor OCR font stroke misrecognitions)
-                # Only apply to queries containing CJK characters to prevent English alphabet overlap false positives
-                is_cjk = any(0x4e00 <= ord(c) <= 0x9fff for c in query_clean)
-                if is_cjk and query_chars and text_chars:
-                    overlap_ratio = len(query_chars & text_chars) / len(query_chars)
-                    if overlap_ratio >= 0.5:
-                        score = max(score, overlap_ratio * 0.85)
+            if not anchor_candidates:
+                logger.warning(f"Spatial anchor text '{anchor_target}' not found on page for query '{query_text}'.")
+                self.last_match = {"found": False, "query": query_text, "score": 0.0, "matched_text": "", "healed": False}
+                return None
             
-            if score > best_score and score >= fuzzy_threshold:
-                best_score = score
-                best_match = ocr_item
+            # Sort anchors by highest score, then reading order
+            anchor_candidates.sort(key=lambda a: (-a["score"], a["box"][1] // 20, a["box"][0]))
+            anchor_box = anchor_candidates[0]["box"]
+            ax1, ay1, ax2, ay2 = anchor_box
+            acx = (ax1 + ax2) / 2.0
+            acy = (ay1 + ay2) / 2.0
+
+            spatial_candidates = []
+            for cand in candidates:
+                cbox = cand["box"]
+                cx1, cy1, cx2, cy2 = cbox
+                tcx = (cx1 + cx2) / 2.0
+                tcy = (cy1 + cy2) / 2.0
+
+                # Directional boundaries
+                if right_of and not (tcx > ax1 and cx2 > ax1):
+                    continue
+                if left_of and not (tcx < ax2 and cx1 < ax2):
+                    continue
+                if below and not (tcy > ay1 and cy2 > ay1):
+                    continue
+                if above and not (tcy < ay2 and cy1 < ay2):
+                    continue
+
+                # Overlap & distances
+                v_overlap = max(0, min(cy2, ay2) - max(cy1, ay1))
+                h_overlap = max(0, min(cx2, ax2) - max(cx1, ax1))
+                v_dist = abs(tcy - acy)
+                h_dist = abs(tcx - acx)
+
+                if right_of:
+                    dx = max(0, cx1 - ax2)
+                    cost = dx + (v_dist * 1.5 if v_overlap > 0 else v_dist * 4.0)
+                elif left_of:
+                    dx = max(0, ax1 - cx2)
+                    cost = dx + (v_dist * 1.5 if v_overlap > 0 else v_dist * 4.0)
+                elif below:
+                    dy = max(0, cy1 - ay2)
+                    cost = dy + (h_dist * 1.5 if h_overlap > 0 else h_dist * 4.0)
+                elif above:
+                    dy = max(0, ay1 - cy2)
+                    cost = dy + (h_dist * 1.5 if h_overlap > 0 else h_dist * 4.0)
+                else:
+                    cost = 0.0
+
+                spatial_candidates.append((cost, cand))
+
+            if not spatial_candidates:
+                logger.warning(f"No candidate '{query_text}' satisfied spatial relationship relative to '{anchor_target}'.")
+                self.last_match = {"found": False, "query": query_text, "score": 0.0, "matched_text": "", "healed": False}
+                return None
+
+            spatial_candidates.sort(key=lambda x: x[0])
+            target_idx = index if index is not None else 0
+            if target_idx < 0 or target_idx >= len(spatial_candidates):
+                logger.warning(f"Index {target_idx} out of range for spatial matches (found {len(spatial_candidates)}).")
+                self.last_match = {"found": False, "query": query_text, "score": 0.0, "matched_text": "", "healed": False}
+                return None
+
+            best_match = spatial_candidates[target_idx][1]
+            logger.info(f"Spatial match successful: found '{best_match['item']['text']}' relative to '{anchor_target}' (cost={spatial_candidates[target_idx][0]:.1f})")
+
+        elif candidates and index is not None:
+            # Ordinal index among all candidates in natural reading order
+            sorted_cands = sorted(candidates, key=lambda c: (c["box"][1] // 20, c["box"][0]))
+            if index < 0 or index >= len(sorted_cands):
+                logger.warning(f"Index {index} out of range (found {len(sorted_cands)} matches).")
+                self.last_match = {"found": False, "query": query_text, "score": 0.0, "matched_text": "", "healed": False}
+                return None
+            best_match = sorted_cands[index]
+            logger.info(f"Selected match at index {index}: '{best_match['item']['text']}'")
+
+        elif candidates:
+            # Standard match: highest score, tie-break by reading order
+            candidates.sort(key=lambda c: (-c["score"], c["box"][1] // 20, c["box"][0]))
+            best_match = candidates[0]
 
         if not best_match:
             logger.warning(f"No OCR text match found for query: '{query_text}'. Trying class label fallback...")
@@ -302,7 +423,7 @@ class VisiFlowDetector:
                 "bar", "search", "box", "area", "form", "text", "label", "link", "tab",
                 "dropdown", "toggle", "radio", "slider", "icon", "container", "panel"
             ]
-            query_clean_lower = query_clean.lower()
+            query_clean_lower = "".join(query_text.lower().split())
             is_class_query = any(pat in query_clean_lower for pat in ui_class_patterns)
             
             if is_class_query:
@@ -411,19 +532,28 @@ class VisiFlowDetector:
             }
             return None
         
-        logger.info(f"Matched text '{best_match['text']}' for query '{query_text}' with score {best_score:.2f}")
+        matched_item = best_match["item"]
+        best_score = best_match["score"]
+        logger.info(f"Matched text '{matched_item['text']}' for query '{query_text}' with score {best_score:.2f}")
         # Self-healing is true when the match isn't an exact match (score < 1.0) but satisfies fuzzy threshold
         healed = best_score < 1.0
         self.last_match = {
             "found": True,
             "query": query_text,
             "score": best_score,
-            "matched_text": best_match["text"],
-            "healed": healed
+            "matched_text": matched_item["text"],
+            "healed": healed,
+            "spatial": {
+                "right_of": right_of,
+                "left_of": left_of,
+                "below": below,
+                "above": above,
+                "index": index
+            }
         }
         
         # 2. Get the bounding box of matched text
-        txt_box = best_match["box"] # [x_min, y_min, x_max, y_max]
+        txt_box = matched_item["box"] # [x_min, y_min, x_max, y_max]
         txt_center = ((txt_box[0] + txt_box[2]) // 2, (txt_box[1] + txt_box[3]) // 2)
 
         # 3. Find if there is a YOLO/contour element bounding box enclosing or heavily overlapping this text

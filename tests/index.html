@@ -114,6 +114,27 @@
             box-sizing: border-box;
             font-weight: 600;
         }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+        .action-btn {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            margin-right: 6px;
+        }
+        .del-btn {
+            background-color: #ef4444;
+        }
+        .del-btn:hover {
+            background-color: #dc2626;
+        }
     </style>
 </head>
 <body>
@@ -124,6 +145,9 @@
     <!-- Success Alerts -->
     <div id="login-alert" class="alert">Logged in successfully!</div>
     <div id="cart-alert" class="alert">Added item to shopping cart!</div>
+    <div id="alice-del-alert" class="alert">Deleted user Alice Smith!</div>
+    <div id="bob-del-alert" class="alert">Deleted user Bob Jones!</div>
+    <div id="bob-edit-alert" class="alert">Editing user Bob Jones!</div>
 
     <div class="header-actions">
         <div id="cart-btn" class="cart-btn" onclick="triggerAlert('cart-alert')">
@@ -143,6 +167,33 @@
             <input type="password" id="password" placeholder="Enter your password">
         </div>
         <button id="submit-btn" style="width: 100%;" onclick="triggerAlert('login-alert')">Submit</button>
+    </div>
+
+    <div class="container">
+        <h2 style="margin-top: 0; color: #cbd5e1;">User Management</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Alice Smith</td>
+                    <td>
+                        <button class="action-btn" onclick="triggerAlert('alice-del-alert')">Delete</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Bob Jones</td>
+                    <td>
+                        <button class="action-btn" onclick="triggerAlert('bob-edit-alert')">Edit</button>
+                        <button class="action-btn del-btn" onclick="triggerAlert('bob-del-alert')">Delete</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <script>

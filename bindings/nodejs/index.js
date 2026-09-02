@@ -1,5 +1,20 @@
 const fetch = require('node-fetch');
 
+function parseOptions(optionsOrTimeout, defaultTimeout = 10000) {
+    if (typeof optionsOrTimeout === 'number') {
+        return { timeoutMs: optionsOrTimeout };
+    }
+    const options = optionsOrTimeout || {};
+    return {
+        timeoutMs: options.timeoutMs || defaultTimeout,
+        rightOf: options.rightOf || options.right_of,
+        leftOf: options.leftOf || options.left_of,
+        below: options.below,
+        above: options.above,
+        index: options.index
+    };
+}
+
 class VisiPage {
     /**
      * Wrap a Playwright Node.js Page object with VisiFlow visual actions.
@@ -12,13 +27,21 @@ class VisiPage {
         this.daemonUrl = options.daemonUrl || 'http://127.0.0.1:8000';
     }
 
-    async _resolveCoordinates(textOrLabel) {
+    async _resolveCoordinates(textOrLabel, spatialOptions = {}) {
         const screenshotBuffer = await this.page.screenshot();
         const base64Image = screenshotBuffer.toString('base64');
 
         const params = new URLSearchParams();
         params.append('image_base64', base64Image);
         params.append('query', textOrLabel);
+
+        if (spatialOptions.rightOf) params.append('right_of', spatialOptions.rightOf);
+        if (spatialOptions.leftOf) params.append('left_of', spatialOptions.leftOf);
+        if (spatialOptions.below) params.append('below', spatialOptions.below);
+        if (spatialOptions.above) params.append('above', spatialOptions.above);
+        if (spatialOptions.index !== undefined && spatialOptions.index !== null) {
+            params.append('index', spatialOptions.index.toString());
+        }
 
         try {
             const response = await fetch(`${this.daemonUrl}/match`, {
@@ -42,10 +65,11 @@ class VisiPage {
         }
     }
 
-    async visualClick(textOrLabel, timeoutMs = 10000) {
+    async visualClick(textOrLabel, optionsOrTimeout = {}) {
+        const opts = parseOptions(optionsOrTimeout, 10000);
         const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-            const coords = await this._resolveCoordinates(textOrLabel);
+        while (Date.now() - start < opts.timeoutMs) {
+            const coords = await this._resolveCoordinates(textOrLabel, opts);
             if (coords) {
                 await this.page.mouse.click(coords.x, coords.y);
                 console.log(`[VisiFlow-JS] Visual Click on '${textOrLabel}' at (${coords.x}, ${coords.y})`);
@@ -53,7 +77,7 @@ class VisiPage {
             }
             await new Promise(r => setTimeout(r, 500));
         }
-        throw new Error(`[VisiFlow-JS] Could not visually locate element '${textOrLabel}' within ${timeoutMs}ms`);
+        throw new Error(`[VisiFlow-JS] Could not visually locate element '${textOrLabel}' within ${opts.timeoutMs}ms`);
     }
 
     async visualPress(key, timeoutMs = 10000) {
@@ -64,10 +88,11 @@ class VisiPage {
         return true;
     }
 
-    async visualFill(textOrLabel, value, timeoutMs = 10000) {
+    async visualFill(textOrLabel, value, optionsOrTimeout = {}) {
+        const opts = parseOptions(optionsOrTimeout, 10000);
         const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-            const coords = await this._resolveCoordinates(textOrLabel);
+        while (Date.now() - start < opts.timeoutMs) {
+            const coords = await this._resolveCoordinates(textOrLabel, opts);
             if (coords) {
                 await this.page.mouse.click(coords.x, coords.y, { clickCount: 3 });
                 await this.page.keyboard.press('Backspace');
@@ -77,13 +102,14 @@ class VisiPage {
             }
             await new Promise(r => setTimeout(r, 500));
         }
-        throw new Error(`[VisiFlow-JS] Could not visually locate input field '${textOrLabel}' within ${timeoutMs}ms`);
+        throw new Error(`[VisiFlow-JS] Could not visually locate input field '${textOrLabel}' within ${opts.timeoutMs}ms`);
     }
 
-    async visualWaitFor(textOrLabel, timeoutMs = 10000) {
+    async visualWaitFor(textOrLabel, optionsOrTimeout = {}) {
+        const opts = parseOptions(optionsOrTimeout, 10000);
         const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-            const coords = await this._resolveCoordinates(textOrLabel);
+        while (Date.now() - start < opts.timeoutMs) {
+            const coords = await this._resolveCoordinates(textOrLabel, opts);
             if (coords) {
                 console.log(`[VisiFlow-JS] Visual element '${textOrLabel}' is present.`);
                 return true;
@@ -93,9 +119,10 @@ class VisiPage {
         throw new Error(`[VisiFlow-JS] Timed out waiting for visual element '${textOrLabel}'`);
     }
 
-    async visualAssertVisible(textOrLabel, timeoutMs = 10000) {
+    async visualAssertVisible(textOrLabel, optionsOrTimeout = {}) {
+        const opts = parseOptions(optionsOrTimeout, 10000);
         try {
-            await this.visualWaitFor(textOrLabel, timeoutMs);
+            await this.visualWaitFor(textOrLabel, opts);
             console.log(`[VisiFlow-JS] Assertion PASSED: Element '${textOrLabel}' is visible.`);
             return true;
         } catch (err) {
@@ -103,17 +130,18 @@ class VisiPage {
         }
     }
 
-    async visualAssertNotVisible(textOrLabel, timeoutMs = 5000) {
+    async visualAssertNotVisible(textOrLabel, optionsOrTimeout = {}) {
+        const opts = parseOptions(optionsOrTimeout, 5000);
         const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-            const coords = await this._resolveCoordinates(textOrLabel);
+        while (Date.now() - start < opts.timeoutMs) {
+            const coords = await this._resolveCoordinates(textOrLabel, opts);
             if (!coords) {
                 console.log(`[VisiFlow-JS] Assertion PASSED: Element '${textOrLabel}' is not visible.`);
                 return true;
             }
             await new Promise(r => setTimeout(r, 500));
         }
-        throw new Error(`[VisiFlow-JS] Assertion FAILED: Element '${textOrLabel}' is still visible after ${timeoutMs}ms`);
+        throw new Error(`[VisiFlow-JS] Assertion FAILED: Element '${textOrLabel}' is still visible after ${opts.timeoutMs}ms`);
     }
 }
 

@@ -1,9 +1,9 @@
 # <img src="assets/visiflow_logo.png" width="38" align="center" alt="Vf Logo"> VisiFlow
 
 [![PyPI version](https://img.shields.io/pypi/v/visiflow.svg)](https://pypi.org/project/visiflow/)
-[![PyPI Release](https://img.shields.io/badge/PyPI-v0.8.2-blue?logo=pypi&logoColor=white)](https://pypi.org/project/visiflow/)
+[![PyPI Release](https://img.shields.io/badge/PyPI-v0.9.0-blue?logo=pypi&logoColor=white)](https://pypi.org/project/visiflow/)
 [![npm version](https://img.shields.io/npm/v/visiflow-js.svg)](https://www.npmjs.com/package/visiflow-js)
-[![npm Release](https://img.shields.io/badge/npm-v0.8.2-red?logo=npm&logoColor=white)](https://www.npmjs.com/package/visiflow-js)
+[![npm Release](https://img.shields.io/badge/npm-v0.9.0-red?logo=npm&logoColor=white)](https://www.npmjs.com/package/visiflow-js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Supported Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-blue.svg)]()
 
@@ -158,6 +158,36 @@ await visipage.visualAssertNotVisible('Loading...');
 
 ---
 
+## 🧭 Spatial Relative Locators (New in v0.9.0)
+
+How do you test tables or pages with **multiple identical buttons** (e.g. dozens of `"Edit"` or `"Delete"` buttons on the same screen)?
+
+VisiFlow solves this with **Spatial Relative Locators** (`right_of`, `left_of`, `below`, `above`, `index`). You can anchor any action to a neighboring text element without writing a single line of XPath:
+
+```python
+# Click "Delete" specifically in the row containing "Alice Smith"
+visipage.visual_click("Delete", right_of="Alice Smith")
+
+# Click "Edit" for Bob
+visipage.visual_click("Edit", right_of="Bob Jones")
+
+# Fill an input field situated directly below a header label
+visipage.visual_fill("Street Address", "123 Main St", below="Billing Information")
+
+# Target by ordinal match index (0-based reading order)
+visipage.visual_click("Delete", index=1)
+```
+
+**In Node.js (`visiflow-js`):**
+```javascript
+// Spatial relative locator options
+await visipage.visualClick("Delete", { rightOf: "Alice Smith" });
+await visipage.visualClick("Edit", { rightOf: "Bob Jones" });
+await visipage.visualFill("Street Address", "123 Main St", { below: "Billing Information" });
+```
+
+---
+
 ## 📊 Self-Healing HTML Test Reports
 
 VisiFlow automatically records every visual action (click, fill, assert) with before/after screenshots and OCR match scores. When the engine uses **fuzzy matching** to recover from a minor text change (e.g., a button label changed from `"Sign In"` to `"Log In"`), it flags the step as **"Self-Healed"** in the report.
@@ -278,12 +308,57 @@ This opens `http://localhost:8000/ui` in your browser, where you can:
 
 ---
 
+## 🤖 VisiFlow MCP Server for AI Agents (New in v0.9.0)
+
+VisiFlow natively supports the **Model Context Protocol (MCP)**, allowing AI tools such as **Claude Desktop**, **Cursor**, **Windsurf**, and autonomous agents to visually drive web automation with **$0 token cost**, **zero selector maintenance**, and **100% offline privacy**.
+
+### How to Configure
+
+#### 1. Claude Desktop (`claude_desktop_config.json`)
+```json
+{
+  "mcpServers": {
+    "visiflow": {
+      "command": "visiflow",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+#### 2. Cursor (`.cursor/mcp.json`)
+```json
+{
+  "mcpServers": {
+    "visiflow": {
+      "command": "visiflow",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+### Available MCP Tools for Agents
+
+| Tool Name | Description | Key Arguments |
+| :--- | :--- | :--- |
+| `visiflow_navigate` | Navigate browser to a specified URL | `url`, `headless` |
+| `visiflow_click` | Visually locate and click an element | `target`, `right_of`, `left_of`, `below`, `above`, `index` |
+| `visiflow_fill` | Visually locate an input field and type text | `target`, `value`, `right_of`, `below`, `index` |
+| `visiflow_press` | Simulate keyboard key presses on active element | `key` (`"Enter"`, `"Tab"`, `"Escape"`) |
+| `visiflow_assert` | Verify that an element or message is visible | `target`, `timeout_ms` |
+| `visiflow_screenshot`| Capture and inspect viewport screenshot | *(none)* |
+| `visiflow_close` | Cleanly terminate the browser session | *(none)* |
+
+---
+
 ## 🛠️ CLI Reference
 
 VisiFlow comes with a CLI tool:
 
-- `visiflow server [--port 8000]`: Start the local HTTP vision daemon.
+- `visiflow server [--port 8000]`: Start the local HTTP vision daemon for cross-language bindings.
 - `visiflow ui`: Launch the interactive Web Playground UI in your browser.
+- `visiflow mcp`: **(New)** Start the Model Context Protocol (MCP) stdio server for AI agents.
 - `visiflow match <screenshot_path> <query>`: Test matching query coordinates directly from terminal.
 
 ---
@@ -294,12 +369,12 @@ VisiFlow comes with a CLI tool:
 
 | Class | Method | Description |
 | :--- | :--- | :--- |
-| `VisiPlaywrightPage` | `visual_click(text, timeout_ms=10000)` | Click an element by its visible text label |
-| | `visual_fill(text, value, timeout_ms=10000)` | Fill an input field located by visible text |
-| | `visual_press(key)` | **(New)** Press a keyboard key (e.g. `"Enter"`, `"{enter}"`, `"Backspace"`) on the active element |
-| | `visual_wait_for(text, timeout_ms=10000)` | Wait for text to become visible |
-| | `visual_assert_visible(text, timeout_ms=10000)` | Assert text is visible on screen |
-| | `visual_assert_not_visible(text, timeout_ms=5000)` | Assert text is NOT visible on screen |
+| `VisiPlaywrightPage` | `visual_click(text, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=10000)` | Click an element by visible text label with optional spatial constraints |
+| | `visual_fill(text, value, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=10000)` | Fill an input field located by visible text |
+| | `visual_press(key)` | Press a keyboard key (e.g. `"Enter"`, `"{enter}"`, `"Backspace"`) on the active element |
+| | `visual_wait_for(text, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=10000)` | Wait for text to become visible |
+| | `visual_assert_visible(text, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=10000)` | Assert text is visible on screen |
+| | `visual_assert_not_visible(text, right_of=None, left_of=None, below=None, above=None, index=None, timeout_ms=5000)` | Assert text is NOT visible on screen |
 | `VisiSeleniumDriver` | *(Same API as above)* | Works with Selenium WebDriver |
 | `global_reporter` | `generate_html_report(output_path)` | Generate self-healing HTML test report |
 
@@ -307,12 +382,12 @@ VisiFlow comes with a CLI tool:
 
 | Class | Method | Description |
 | :--- | :--- | :--- |
-| `VisiPage` | `visualClick(text, timeoutMs=10000)` | Click an element by visible text |
-| | `visualFill(text, value, timeoutMs=10000)` | Fill an input field by visible text |
-| | `visualPress(key)` | **(New)** Press a keyboard key (e.g. `"Enter"`, `"{enter}"`, `"Backspace"`) on the active element |
-| | `visualWaitFor(text, timeoutMs=10000)` | Wait for text to become visible |
-| | `visualAssertVisible(text, timeoutMs=10000)` | Assert text is visible |
-| | `visualAssertNotVisible(text, timeoutMs=5000)` | Assert text is NOT visible |
+| `VisiPage` | `visualClick(text, optionsOrTimeout)` | Click an element by visible text (`{ rightOf, leftOf, below, above, index, timeoutMs }`) |
+| | `visualFill(text, value, optionsOrTimeout)` | Fill an input field by visible text |
+| | `visualPress(key)` | Press a keyboard key (e.g. `"Enter"`, `"{enter}"`, `"Backspace"`) on the active element |
+| | `visualWaitFor(text, optionsOrTimeout)` | Wait for text to become visible |
+| | `visualAssertVisible(text, optionsOrTimeout)` | Assert text is visible |
+| | `visualAssertNotVisible(text, optionsOrTimeout)` | Assert text is NOT visible |
 
 ---
 
