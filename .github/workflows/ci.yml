@@ -38,6 +38,7 @@ jobs:
           python tests/test_mcp.py
           python tests/test_runner.py
           python tests/test_desktop.py
+          python tests/test_batch_and_debug.py
 
       - name: Run Spatial Locators Integration Test
         run: |
@@ -49,7 +50,7 @@ jobs:
 
       - name: Run Declarative YAML Runner CLI Test
         run: |
-          python -m visiflow run tests/sample_test.yaml --headless
+          python -m visiflow run tests/sample_test.yaml --headless --junit test_results.xml
 
   test-nodejs:
     name: Node.js Bindings Check

@@ -24,6 +24,8 @@ class VisiFlowDetector:
         self.ocr_reader = None
         self.languages = languages
         self.last_match = None
+        self.last_ocr_results = []
+        self.last_candidates = []
         self._init_yolo(model_path)
         self._init_ocr()
 
@@ -237,6 +239,7 @@ class VisiFlowDetector:
                     "box": [x_min, y_min, x_max, y_max],
                     "confidence": float(conf)
                 })
+            self.last_ocr_results = ocr_elements
             return ocr_elements
         except Exception as e:
             import traceback
@@ -577,3 +580,65 @@ class VisiFlowDetector:
             # Fallback to clicking the text center directly
             logger.info("Target text center is not inside any detected UI element container. Clicking text center directly.")
             return txt_center
+
+    def get_closest_candidates(self, query_text: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """
+        Return the top_k OCR text items on the screen closest in similarity to query_text.
+        Used for smart debugging, failure diagnosis, and auto-suggest.
+        """
+        if not hasattr(self, 'last_ocr_results') or not self.last_ocr_results:
+            return []
+        
+        scored = []
+        seen = set()
+        for item in self.last_ocr_results:
+            txt = item["text"].strip()
+            if not txt or txt in seen:
+                continue
+            seen.add(txt)
+            score = self._compute_text_score(query_text, txt)
+            scored.append({
+                "text": txt,
+                "score": round(score, 2),
+                "box": item["box"],
+                "confidence": item.get("confidence", 1.0)
+            })
+        
+        scored.sort(key=lambda x: x["score"], reverse=True)
+        return scored[:top_k]
+
+    def generate_visual_debug_diff(self, img_path: str, query_text: str, output_path: str) -> str:
+        """
+        Generate an annotated debug screenshot highlighting detected OCR boxes and top candidates.
+        Provides instant visual feedback on why an element was not matched.
+        """
+        img = cv2.imread(img_path)
+        if img is None:
+            return img_path
+
+        candidates = self.get_closest_candidates(query_text, top_k=3)
+        candidate_boxes = [c["box"] for c in candidates]
+
+        # Draw all OCR text boxes in dim gray
+        for item in getattr(self, 'last_ocr_results', []):
+            box = item["box"]
+            if box not in candidate_boxes:
+                cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (120, 120, 120), 1)
+
+        # Highlight top closest candidates in Bright Amber / Orange
+        for idx, cand in enumerate(candidates):
+            box = cand["box"]
+            # Amber outline
+            cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (0, 165, 255), 2)
+            label = f"#{idx+1} {cand['text']} ({int(cand['score']*100)}%)"
+            cv2.putText(img, label, (box[0], max(16, box[1] - 6)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1, cv2.LINE_AA)
+
+        # Draw top banner
+        header = f"DEBUG: '{query_text}' not found. Closest: " + ", ".join([f"'{c['text']}' ({int(c['score']*100)}%)" for c in candidates])
+        cv2.rectangle(img, (0, 0), (img.shape[1], 34), (30, 30, 40), -1)
+        cv2.putText(img, header[:120], (10, 23), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 220, 255), 1, cv2.LINE_AA)
+
+        cv2.imwrite(output_path, img)
+        return output_path
+

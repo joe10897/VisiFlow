@@ -377,15 +377,30 @@ steps:
 
 ### Run in Terminal or CI/CD
 ```bash
-# Run YAML test and generate self-healing HTML report
+# Run a single YAML test
 visiflow run checkout.yaml
 
-# Run with visible browser
-visiflow run checkout.yaml --headed
+# Run an entire test directory in parallel with 4 workers
+visiflow run tests/ --workers 4
 
-# Specify custom report path
-visiflow run checkout.yaml --report my_report.html
+# Export standard JUnit XML for GitHub Actions / Jenkins / GitLab CI
+visiflow run tests/ --junit junit.xml --report-dir reports/
+
+# Enable smart auto-healing (updates test YAML scripts when UI text changes)
+visiflow run tests/ --auto-heal
+
+# Interactive debugger mode (prompts before applying suggestions)
+visiflow run tests/ --interactive
 ```
+
+---
+
+## 🔍 Smart Visual Debugger & Auto-Suggest (New)
+
+When a visual locator cannot find a target (e.g. because of a UI copy change from `"Submit"` to `"Confirm Order"`):
+1. **Intelligent Candidates Ranking**: Analyzes all on-screen elements and ranks closest matches with similarity scores.
+2. **Visual Diff Heatmap**: Automatically saves an annotated screenshot (`debug_diff_step_N.png`) showing all detected text boxes with amber highlight markers for top candidates.
+3. **One-Click / Auto-Heal (`--auto-heal`)**: Automatically reconciles and updates the target selector in your `.yaml` test script, eliminating maintenance overhead!
 
 ---
 

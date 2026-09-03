@@ -31,11 +31,16 @@ def main():
     mcp_parser = subparsers.add_parser("mcp", help="Start the VisiFlow Model Context Protocol (MCP) Stdio server for AI agents (Cursor, Claude Desktop)")
 
     # Subcommand: run
-    run_parser = subparsers.add_parser("run", help="Execute a declarative YAML or JSON visual E2E test file")
-    run_parser.add_argument("test_file", help="Path to YAML/JSON test file (e.g. test.yaml)")
+    run_parser = subparsers.add_parser("run", help="Execute declarative YAML or JSON visual E2E tests (files or directory)")
+    run_parser.add_argument("tests", nargs="+", help="Path to YAML/JSON test file(s) or directory containing test files")
+    run_parser.add_argument("--workers", "-w", type=int, default=1, help="Number of parallel worker processes (default: 1)")
     run_parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
     run_parser.add_argument("--headed", action="store_true", help="Run browser with visible UI")
-    run_parser.add_argument("--report", default=None, help="Output path for self-healing HTML report")
+    run_parser.add_argument("--report", default=None, help="Output path for self-healing HTML report (for single test)")
+    run_parser.add_argument("--report-dir", default=None, help="Directory to save HTML reports when running multiple test files")
+    run_parser.add_argument("--junit", default=None, help="Output path for standard JUnit XML report (e.g. junit.xml)")
+    run_parser.add_argument("--auto-heal", action="store_true", help="Automatically update test scripts with best visual match on failure")
+    run_parser.add_argument("--interactive", "-i", action="store_true", help="Interactively prompt to apply auto-heal suggestions on failure")
     run_parser.add_argument("--browser", default="chromium", choices=["chromium", "firefox", "webkit"], help="Browser engine")
 
     # Clean raw args to prevent wrapper script path artifacts
@@ -67,10 +72,21 @@ def main():
         from .mcp import start_mcp_server
         start_mcp_server()
     elif args.command == "run":
-        from .runner import VisiFlowYAMLRunner
-        runner = VisiFlowYAMLRunner(args.test_file)
+        from .runner import run_suite
         headless = True if args.headless else (False if args.headed else None)
-        success = runner.execute(headless=headless, report_path=args.report, browser_type=args.browser)
+        report_dir = args.report_dir
+        if not report_dir and args.report:
+            report_dir = str(Path(args.report).parent)
+        success = run_suite(
+            target_paths=args.tests,
+            workers=args.workers,
+            headless=headless,
+            report_dir=report_dir,
+            junit_path=args.junit,
+            browser_type=args.browser,
+            auto_heal=args.auto_heal,
+            interactive=args.interactive
+        )
         sys.exit(0 if success else 1)
     elif args.command == "match":
         img_path = Path(args.image)
