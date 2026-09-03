@@ -1,0 +1,9 @@
+# Smithery.ai configuration for VisiFlow MCP Server
+# https://smithery.ai/docs/config#smitheryyaml
+name: visiflow
+description: "Fast, 100% local visual browser automation and testing via YOLO and EasyOCR with $0 LLM token cost."
+startCommand:
+  type: stdio
+  config:
+    command: "visiflow"
+    args: ["mcp"]

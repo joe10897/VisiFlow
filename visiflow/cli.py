@@ -1,7 +1,6 @@
 import argparse
 import sys
 import webbrowser
-import uvicorn
 from pathlib import Path
 
 from .core import VisiFlowDetector, logger
@@ -47,9 +46,19 @@ def main():
     args = parser.parse_args(raw_args)
 
     if args.command == "server":
+        try:
+            import uvicorn
+        except ImportError:
+            print("Error: 'uvicorn' is required for the server. Run 'pip install uvicorn fastapi python-multipart'")
+            sys.exit(1)
         print(f"Starting VisiFlow Daemon on http://{args.host}:{args.port}")
         uvicorn.run("visiflow.server:app", host=args.host, port=args.port, log_level="info")
     elif args.command == "ui":
+        try:
+            import uvicorn
+        except ImportError:
+            print("Error: 'uvicorn' is required for the UI. Run 'pip install uvicorn fastapi python-multipart'")
+            sys.exit(1)
         url = f"http://{args.host}:{args.port}/ui"
         print(f"Opening VisiFlow Web Playground at {url}...")
         webbrowser.open(url)
