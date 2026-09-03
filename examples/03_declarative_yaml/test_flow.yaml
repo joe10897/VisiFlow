@@ -1,0 +1,13 @@
+name: "Sample Login & Spatial Actions Flow"
+description: "Declarative test flow demonstrating form filling and spatial table clicking"
+headless: false
+report: "sample_yaml_report.html"
+
+steps:
+  - goto: "https://github.com/login"
+  - fill: "Username or email address"
+    value: "visiflow_user"
+  - fill: "Password"
+    value: "visiflow_secret_password"
+  - click: "Sign in"
+  - sleep: 2.0
